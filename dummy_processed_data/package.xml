@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>dummy_ekf_sensor_data_pub</name>
+  <name>dummy_processed_data</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
   <maintainer email="yubaby2003@163.com">ubuntu</maintainer>
@@ -14,7 +14,10 @@
 
   <export>
     <build_type>ament_cmake</build_type>
+    
     <depend>rclcpp</depend>
     <depend>std_msgs</depend>
+    <depend>interfaces</depend>
+    
   </export>
 </package>
