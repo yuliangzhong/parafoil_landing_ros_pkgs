@@ -35,6 +35,7 @@ class DummyProcessedDataPub : public rclcpp::Node
     private:
     void timer_callback()
     {
+        // auto timestamp = this->get_clock()->now();
         auto pos = interfaces::msg::Position();
         pos.x = 0.0; pos.y = 0.0; pos.z = 0.0;
         pos.header.stamp = this->get_clock()->now();

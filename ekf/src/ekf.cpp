@@ -16,73 +16,54 @@
 #include "message_filters/subscriber.h"
 #include "message_filters/time_synchronizer.h"
 
-#include <iostream>
-using std::endl;
-using std::cout;
-
 using std::placeholders::_1;
 using std::placeholders::_2;
 using std::placeholders::_3;
 using std::placeholders::_4;
 using std::placeholders::_5;
 
+using Position = interfaces::msg::Position;
+using Velocity = interfaces::msg::Velocity;
+using Pose = interfaces::msg::Pose;
+using Acc = interfaces::msg::BodyAcceleration;
+using Omega = interfaces::msg::BodyAngularVelocity;
 
 class EKF : public rclcpp::Node
 {
   public:
     EKF() : Node("ekf")
     {
-      // pos_sub_ = this->create_subscription<interfaces::msg::Position>(
-      // "dummy_position", 10, std::bind(&EKF::position_callback, this, _1));
       pos_sub_.subscribe(this, "dummy_position");
       vel_sub_.subscribe(this, "dummy_velocity");
       pose_sub_.subscribe(this, "dummy_pose");
       body_acc_sub_.subscribe(this, "dummy_body_acc");
       body_omega_sub_.subscribe(this, "dummy_body_omega");
 
-      sync_ = std::make_shared<message_filters::TimeSynchronizer<interfaces::msg::Position, 
-                                                      interfaces::msg::Velocity,
-                                                      interfaces::msg::Pose,
-                                                      interfaces::msg::BodyAcceleration,
-                                                      interfaces::msg::BodyAngularVelocity>>
-                                                      (pos_sub_, vel_sub_, pose_sub_, body_acc_sub_, body_omega_sub_, 6);
+      sync_ = std::make_shared<message_filters::TimeSynchronizer<Position, Velocity, Pose, Acc, Omega>>
+                                                      (pos_sub_, vel_sub_, pose_sub_, body_acc_sub_, body_omega_sub_, 10);
       
-      // syncApproximate_.registerCallback(std::bind(&EKF::sync_callback, this, _1, _2, _3, _4, _5));
+      sync_->registerCallback(std::bind(&EKF::sync_callback, this, _1, _2, _3, _4, _5));
     }
 
   private:
-    void sync_callback(const interfaces::msg::Position::ConstSharedPtr& msg_pos,
-                       const interfaces::msg::Velocity::ConstSharedPtr& msg_vel,
-                       const interfaces::msg::Pose::ConstSharedPtr& msg_pose,
-                       const interfaces::msg::BodyAcceleration::ConstSharedPtr& msg_body_acc,
-                       const interfaces::msg::BodyAngularVelocity::ConstSharedPtr& msg_body_omega) const
+    void sync_callback(const Position::ConstSharedPtr& msg_pos,
+                       const Velocity::ConstSharedPtr& msg_vel,
+                       const Pose::ConstSharedPtr& msg_pose,
+                       const Acc::ConstSharedPtr& msg_body_acc,
+                       const Omega::ConstSharedPtr& msg_body_omega) const
     {
-      cout<<"in sync_callback"<<endl;
+      // implement Extended Kalman Filter here
+
       RCLCPP_INFO(this->get_logger(), "I am at: (%.2f, %.2f, %.2f)", msg_pos->x, msg_pos->y, msg_pos->z);
     }
 
-    // rclcpp::Subscription<interfaces::msg::Position>::SharedPtr pos_sub_;
-    // rclcpp::Subscription<interfaces::msg::Velocity>::SharedPtr vel_sub_;
-    // rclcpp::Subscription<interfaces::msg::Pose>::SharedPtr pose_sub_;
-    // rclcpp::Subscription<interfaces::msg::BodyAcceleration>::SharedPtr body_acc_sub_;
-    // rclcpp::Subscription<interfaces::msg::BodyAngularVelocity>::SharedPtr body_omega_sub_;
-    message_filters::Subscriber<interfaces::msg::Position> pos_sub_;
-    message_filters::Subscriber<interfaces::msg::Velocity> vel_sub_;
-    message_filters::Subscriber<interfaces::msg::Pose> pose_sub_;
-    message_filters::Subscriber<interfaces::msg::BodyAcceleration> body_acc_sub_;
-    message_filters::Subscriber<interfaces::msg::BodyAngularVelocity> body_omega_sub_;
-
-    // typedef message_filters::sync_policies::ApproximateTime<interfaces::msg::Position, interfaces::msg::Velocity, 
-    //                                                           interfaces::msg::Pose, interfaces::msg::BodyAcceleration,
-    //                                                           interfaces::msg::BodyAngularVelocity> approximate_policy;
-    // message_filters::Synchronizer<approximate_policy> syncApproximate_(approximate_policy(10), pos_sub_, vel_sub_, pose_sub_, body_acc_sub_, body_omega_sub_);
+    message_filters::Subscriber<Position> pos_sub_;
+    message_filters::Subscriber<Velocity> vel_sub_;
+    message_filters::Subscriber<Pose> pose_sub_;
+    message_filters::Subscriber<Acc> body_acc_sub_;
+    message_filters::Subscriber<Omega> body_omega_sub_;
       
-
-    std::shared_ptr<message_filters::TimeSynchronizer<interfaces::msg::Position, 
-                                                      interfaces::msg::Velocity,
-                                                      interfaces::msg::Pose,
-                                                      interfaces::msg::BodyAcceleration,
-                                                      interfaces::msg::BodyAngularVelocity>> sync_;
+    std::shared_ptr<message_filters::TimeSynchronizer<Position, Velocity, Pose, Acc, Omega>> sync_;
 };
 
 int main(int argc, char * argv[])
@@ -92,3 +73,8 @@ int main(int argc, char * argv[])
   rclcpp::shutdown();
   return 0;
 }
+
+// reference
+// https://answers.ros.org/question/361637/using-c-message-filters-in-ros2/
+// https://github.com/alsora/ros2-code-examples/blob/master/simple_time_sync/main.cpp
+// https://answers.ros.org/question/291876/how-can-i-subscribe-to-2-different-topics-in-a-synchronised-manner-in-ros2/

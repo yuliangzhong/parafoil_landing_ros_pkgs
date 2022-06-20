@@ -17,7 +17,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Pose.msg"
   "msg/BodyAcceleration.msg"
   "msg/BodyAngularVelocity.msg"
-  DEPENDENCIES std_msgs
+  DEPENDENCIES builtin_interfaces std_msgs
 )
 
 # uncomment the following section in order to fill in
