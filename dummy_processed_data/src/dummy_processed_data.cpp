@@ -37,22 +37,27 @@ class DummyProcessedDataPub : public rclcpp::Node
     {
         auto pos = interfaces::msg::Position();
         pos.x = 0.0; pos.y = 0.0; pos.z = 0.0;
+        pos.header.stamp = this->get_clock()->now();
         pos_pub_->publish(pos);
 
         auto vel = interfaces::msg::Velocity();
         vel.vx = 0.0; vel.vy = 0.0; vel.vz = 0.0;
+        vel.header.stamp = this->get_clock()->now();
         vel_pub_->publish(vel);
 
         auto pose = interfaces::msg::Pose();
         pose.roll = 0.0; pose.pitch = 0.0; pose.yaw = 0.0;
+        pose.header.stamp = this->get_clock()->now();
         pose_pub_->publish(pose);
 
         auto body_acc = interfaces::msg::BodyAcceleration();
         body_acc.ax = 0.0; body_acc.ay = 0.0; body_acc.az = 0.0;
+        body_acc.header.stamp = this->get_clock()->now();
         body_acc_pub_->publish(body_acc);
 
         auto body_omega = interfaces::msg::BodyAngularVelocity();
         body_omega.wx = 0.0; body_omega.wy = 0.0; body_omega.wz = 0.0;
+        body_omega.header.stamp = this->get_clock()->now();
         body_omega_pub_->publish(body_omega);
 
         RCLCPP_INFO(this->get_logger(), "Published once");
