@@ -42,10 +42,6 @@ using Sync = message_filters::Synchronizer<ApproPolicy>;
 
 using MatrixXd = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>;
 using VectorXd = Eigen::Matrix<double, Eigen::Dynamic, 1>;
-// using Matrix9d = Eigen::Matrix<double, 9, 9>;
-// using Vector9d = Eigen::Matrix<double, 9, 1>;
-// using Matrix6d = Eigen::Matrix<double, 6, 6>;
-// using Vector6d = Eigen::Matrix<double, 6, 1>;
 
 #define pi 3.141592653
 
@@ -88,6 +84,7 @@ class EKF : public rclcpp::Node
       R_(6,6) = pow(0.1/180*pi,2);
       R_(7,7) = pow(0.1/180*pi,2);
       R_(8,8) = pow(0.5/180*pi,2);
+      // R_.blkdiag ...try
     }
 
   private:
@@ -110,6 +107,94 @@ class EKF : public rclcpp::Node
       VectorXd xp = VectorXd::Zero(9);
       MatrixXd A = MatrixXd::Zero(9,9); 
       MatrixXd S = MatrixXd::Zero(9,6);
+
+      double phi = states_mu_(6); // roll
+      double theta = states_mu_(7); // pitch
+      double psi = states_mu_(8); // yaw
+
+      MatrixXd C_IB(3,3);
+      C_IB << cos(theta)*cos(psi), sin(phi)*sin(theta)*cos(psi)-cos(theta)*sin(psi), cos(phi)*sin(theta)*cos(psi)+sin(phi)*sin(psi),
+              cos(theta)*sin(psi), sin(phi)*sin(theta)*sin(psi)+cos(phi)*cos(psi), cos(phi)*sin(theta)*sin(psi)-sin(phi)*cos(psi),
+              -sin(theta), sin(phi)*cos(theta), cos(phi)*cos(theta);
+
+      MatrixXd L(3,3);
+      L <<  1, sin(phi)*tan(theta), cos(phi)*tan(theta),
+            0, cos(phi), -sin(phi),
+            0, sin(phi)/cos(theta), cos(phi)/cos(theta);
+
+      MatrixXd dC_IB_dphi(3,3);
+      dC_IB_dphi << 0, cos(phi)*sin(theta)*cos(psi), -sin(phi)*sin(theta)*cos(psi)+cos(phi)*sin(psi),
+                    0, cos(phi)*sin(theta)*sin(psi)-sin(phi)*cos(psi), -sin(phi)*sin(theta)*sin(psi)-cos(phi)*cos(psi),
+                    0, cos(phi)*cos(theta), -sin(phi)*cos(theta);
+
+      MatrixXd dC_IB_dtheta(3,3); 
+      dC_IB_dtheta << -sin(theta)*cos(psi), sin(phi)*cos(theta)*cos(psi)+sin(theta)*sin(psi), cos(phi)*cos(theta)*cos(psi),
+                      -sin(theta)*sin(psi), sin(phi)*cos(theta)*sin(psi), cos(phi)*cos(theta)*sin(psi),
+                      -cos(theta), -sin(phi)*sin(theta), -cos(phi)*sin(theta);
+
+      MatrixXd dC_IB_dpsi(3,3); 
+      dC_IB_dpsi << -cos(theta)*sin(psi), -sin(phi)*sin(theta)*sin(psi)-cos(theta)*cos(psi), -cos(phi)*sin(theta)*sin(psi)+sin(phi)*cos(psi),
+                    cos(theta)*cos(psi), sin(phi)*sin(theta)*cos(psi)-cos(phi)*sin(psi), cos(phi)*sin(theta)*cos(psi)+sin(phi)*sin(psi),
+                    0, 0, 0;
+      
+      MatrixXd dL_dphi(3,3); 
+      dL_dphi << 0, cos(phi)*tan(theta), -sin(phi)*tan(theta),
+                 0, -sin(phi), -cos(phi),
+                 0, cos(phi)/cos(theta), -sin(phi)/cos(theta);
+
+      MatrixXd dL_dtheta(3,3); 
+      dL_dtheta << 0, sin(phi)/pow(cos(theta),2), cos(phi)/pow(cos(theta),2),
+                   0, 0, 0,
+                   0, sin(phi)*sin(theta)/pow(cos(theta),2), cos(phi)*sin(theta)/pow(cos(theta),2);
+      
+      MatrixXd dL_dpsi = MatrixXd::Zero(3,3);
+
+      MatrixXd J_C_IB(3,9);
+      J_C_IB.block(0,0,3,3) = dC_IB_dphi;
+      J_C_IB.block(0,3,3,3) = dC_IB_dtheta;
+      J_C_IB.block(0,6,3,3) = dC_IB_dpsi;
+
+      MatrixXd J_L(3,9);
+      J_L.block(0,0,3,3) = dL_dphi;
+      J_L.block(0,3,3,3) = dL_dtheta;
+      J_L.block(0,6,3,3) = dL_dpsi;
+
+      // xp.block(0,0,3,1) = states_mu_.block(0,0,3,1) + Ts_*states_mu_.block(3,0,3,1);
+ 
+      xp.segment(0,3) = states_mu_.segment(0,3) + Ts_*states_mu_.segment(3,3);
+      xp.segment(3,3) = states_mu_.segment(3,3) + Ts_*C_IB*U.segment(0,3);
+      xp.segment(6,3) = states_mu_.segment(6,3) + Ts_*L*U.segment(3,3);
+
+      A.block(0,0,3,3).setIdentity();
+      A.block(0,3,3,3) = Ts_*MatrixXd::Identity(3,3);
+      A.block(0,6,3,3).setZero();
+      A.block(3,0,3,3).setZero();
+      A.block(3,3,3,3).setIdentity();
+      A.block(3,6,3,3) = Ts_*J_C_IB*Eigen::blkdiag(U.segment(0,3), U.segment(0,3), U.segment(0,3));
+      A.block(6,0,3,6).setZero();
+      A.block(6,6,3,3) = MatrixXd::Identity(3,3) + Ts_*J_L*Eigen::blkdiag(U.segment(3,3), U.segment(3,3), U.segment(3,3));
+      // A(1:3,:) = [eye(3), Ts*eye(3), zeros(3,3)];
+      // A(4:6,:) = [zeros(3,3), eye(3), Ts*J_C_IB*blkdiag(U(1:3)+D(1:3), U(1:3)+D(1:3), U(1:3)+D(1:3))];
+      // A(7:9,:) = [zeros(3,6), eye(3)+Ts*J_L*blkdiag(U(4:6)+D(4:6), U(4:6)+D(4:6), U(4:6)+D(4:6))];
+
+      // S(1:3,:) = zeros(3,6);
+      // S(4:6,:) = [Ts*C_IB, zeros(3,3)];
+      // S(7:9,:) = [zeros(3,3), Ts*L];
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       MatrixXd Pp = A*states_sigma_*A.transpose() + S*Q_*S.transpose();
 
       // Measurement update
