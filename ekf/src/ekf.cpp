@@ -22,7 +22,6 @@
 #include <cmath>
 
 #include <iostream>
-
 using std::cout; using std::endl;
 
 using std::placeholders::_1;
@@ -43,7 +42,7 @@ using Sync = message_filters::Synchronizer<ApproPolicy>;
 using MatrixXd = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>;
 using VectorXd = Eigen::Matrix<double, Eigen::Dynamic, 1>;
 
-#define pi 3.141592653
+#define PI 3.141592653
 
 class EKF : public rclcpp::Node
 {
@@ -76,14 +75,14 @@ class EKF : public rclcpp::Node
 
       Q_ = MatrixXd::Zero(6,6);
       Q_.block(0,0,3,3) = pow(0.1,2)*MatrixXd::Identity(3,3);
-      Q_.block(3,3,3,3) = pow(0.1/180*pi,2)*MatrixXd::Identity(3,3);
+      Q_.block(3,3,3,3) = pow(0.1/180*PI,2)*MatrixXd::Identity(3,3);
 
       R_ = MatrixXd::Zero(9,9);
       R_.block(0,0,3,3) = pow(2,2)*MatrixXd::Identity(3,3);
       R_.block(3,3,3,3) = pow(0.1,2)*MatrixXd::Identity(3,3);
-      R_(6,6) = pow(0.1/180*pi,2);
-      R_(7,7) = pow(0.1/180*pi,2);
-      R_(8,8) = pow(0.5/180*pi,2);
+      R_(6,6) = pow(0.1/180*PI,2);
+      R_(7,7) = pow(0.1/180*PI,2);
+      R_(8,8) = pow(0.5/180*PI,2);
       // R_.blkdiag ...try
     }
 
@@ -165,35 +164,25 @@ class EKF : public rclcpp::Node
       xp.segment(3,3) = states_mu_.segment(3,3) + Ts_*C_IB*U.segment(0,3);
       xp.segment(6,3) = states_mu_.segment(6,3) + Ts_*L*U.segment(3,3);
 
+      MatrixXd U_diag(9,3);
+      U_diag.block(0,0,3,1) = U.segment(0,3);
+      U_diag.block(3,1,3,1) = U.segment(0,3);
+      U_diag.block(6,2,3,1) = U.segment(0,3);
+
       A.block(0,0,3,3).setIdentity();
       A.block(0,3,3,3) = Ts_*MatrixXd::Identity(3,3);
       A.block(0,6,3,3).setZero();
       A.block(3,0,3,3).setZero();
       A.block(3,3,3,3).setIdentity();
-      A.block(3,6,3,3) = Ts_*J_C_IB*Eigen::blkdiag(U.segment(0,3), U.segment(0,3), U.segment(0,3));
+      A.block(3,6,3,3) = Ts_*J_C_IB*U_diag;
       A.block(6,0,3,6).setZero();
-      A.block(6,6,3,3) = MatrixXd::Identity(3,3) + Ts_*J_L*Eigen::blkdiag(U.segment(3,3), U.segment(3,3), U.segment(3,3));
-      // A(1:3,:) = [eye(3), Ts*eye(3), zeros(3,3)];
-      // A(4:6,:) = [zeros(3,3), eye(3), Ts*J_C_IB*blkdiag(U(1:3)+D(1:3), U(1:3)+D(1:3), U(1:3)+D(1:3))];
-      // A(7:9,:) = [zeros(3,6), eye(3)+Ts*J_L*blkdiag(U(4:6)+D(4:6), U(4:6)+D(4:6), U(4:6)+D(4:6))];
+      A.block(6,6,3,3) = MatrixXd::Identity(3,3) + Ts_*J_L*U_diag;
 
-      // S(1:3,:) = zeros(3,6);
-      // S(4:6,:) = [Ts*C_IB, zeros(3,3)];
-      // S(7:9,:) = [zeros(3,3), Ts*L];
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+      S.block(0,0,3,6).setZero();
+      S.block(3,0,3,3) = Ts_*C_IB;
+      S.block(3,3,3,3).setZero();
+      S.block(6,0,3,3).setZero();
+      S.block(6,3,3,3) = Ts_*L;
 
       MatrixXd Pp = A*states_sigma_*A.transpose() + S*Q_*S.transpose();
 
@@ -204,21 +193,14 @@ class EKF : public rclcpp::Node
       MatrixXd K = ((H*Pp*H.transpose() + M*R_*M.transpose()).transpose().ldlt().solve((Pp*H.transpose()).transpose())).transpose();
       // MatrixXd K = Pp*H.transpose()*(H*Pp*H.transpose() + M*R_*M.transpose()).inverse();
       VectorXd Dz = z_bar - z;
-      Dz(8) = fmod(Dz(8)+pi, 2*pi) - pi;
+      Dz(8) = fmod(Dz(8)+PI, 2*PI) - PI;
 
       states_mu_ = xp + K*Dz;
       states_sigma_ = (MatrixXd::Identity(9,9) - K*H)*Pp;
 
       // publish current estimation
-      // states_pub = fmod(states_mu_(8)+pi, 2*pi) - pi;
-
-
-
-
-
-
-
-
+      // states_pub = fmod(states_mu_(8)+PI, 2*PI) - PI;
+      
       RCLCPP_INFO(this->get_logger(), "I am at: (%.2f, %.2f, %.2f)", msg_pos->x, msg_pos->y, msg_pos->z);
       
       ///////// Extended Kalman Filter Ends
