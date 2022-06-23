@@ -30,6 +30,8 @@ using std::placeholders::_3;
 using std::placeholders::_4;
 using std::placeholders::_5;
 
+using namespace std::chrono_literals;
+
 using Position = interfaces::msg::Position;
 using Velocity = interfaces::msg::Velocity;
 using Pose = interfaces::msg::Pose;
@@ -44,11 +46,14 @@ using VectorXd = Eigen::Matrix<double, Eigen::Dynamic, 1>;
 
 #define PI 3.141592653
 
+
 class EKF : public rclcpp::Node
 {
   public:
     EKF() : Node("ekf"), sync_(Sync(ApproPolicy(10), pos_sub_, vel_sub_, pose_sub_, body_acc_sub_, body_omega_sub_))
     {
+      states_pub_ = this->create_publisher<interfaces::msg::States>("estimated_states", 10);
+
       pos_sub_.subscribe(this, "dummy_position");
       vel_sub_.subscribe(this, "dummy_velocity");
       pose_sub_.subscribe(this, "dummy_pose");
@@ -64,7 +69,8 @@ class EKF : public rclcpp::Node
       sync_.registerCallback(std::bind(&EKF::sync_ekf_callback, this, _1, _2, _3, _4, _5));
 
       // Read from param
-      Ts_ = 0.5; // [ms]
+      Ts_ = 0.1; // [s]
+      
       // initialize EKF parameters
       states_mu_ = VectorXd::Zero(9);
 
@@ -83,7 +89,6 @@ class EKF : public rclcpp::Node
       R_(6,6) = pow(0.1/180*PI,2);
       R_(7,7) = pow(0.1/180*PI,2);
       R_(8,8) = pow(0.5/180*PI,2);
-      // R_.blkdiag ...try
     }
 
   private:
@@ -103,9 +108,6 @@ class EKF : public rclcpp::Node
                msg_pose->roll, msg_pose-> pitch, msg_pose->yaw;
 
       // Prior update
-      VectorXd xp = VectorXd::Zero(9);
-      MatrixXd A = MatrixXd::Zero(9,9); 
-      MatrixXd S = MatrixXd::Zero(9,6);
 
       double phi = states_mu_(6); // roll
       double theta = states_mu_(7); // pitch
@@ -158,8 +160,11 @@ class EKF : public rclcpp::Node
       J_L.block(0,3,3,3) = dL_dtheta;
       J_L.block(0,6,3,3) = dL_dpsi;
 
-      // xp.block(0,0,3,1) = states_mu_.block(0,0,3,1) + Ts_*states_mu_.block(3,0,3,1);
- 
+
+      VectorXd xp = VectorXd::Zero(9);
+      MatrixXd A = MatrixXd::Zero(9,9); 
+      MatrixXd S = MatrixXd::Zero(9,6);
+
       xp.segment(0,3) = states_mu_.segment(0,3) + Ts_*states_mu_.segment(3,3);
       xp.segment(3,3) = states_mu_.segment(3,3) + Ts_*C_IB*U.segment(0,3);
       xp.segment(6,3) = states_mu_.segment(6,3) + Ts_*L*U.segment(3,3);
@@ -199,9 +204,20 @@ class EKF : public rclcpp::Node
       states_sigma_ = (MatrixXd::Identity(9,9) - K*H)*Pp;
 
       // publish current estimation
-      // states_pub = fmod(states_mu_(8)+PI, 2*PI) - PI;
-      
-      RCLCPP_INFO(this->get_logger(), "I am at: (%.2f, %.2f, %.2f)", msg_pos->x, msg_pos->y, msg_pos->z);
+      auto estimated_state = interfaces::msg::States();
+      estimated_state.x = states_mu_(0);
+      estimated_state.y = states_mu_(1);
+      estimated_state.z = states_mu_(2);
+      estimated_state.vx = states_mu_(3);
+      estimated_state.vy = states_mu_(4);
+      estimated_state.vz = states_mu_(5);
+      estimated_state.roll = states_mu_(6);
+      estimated_state.pitch = states_mu_(7);
+      estimated_state.yaw = fmod(states_mu_(8)+PI, 2*PI) - PI;
+      states_pub_->publish(estimated_state);
+
+      RCLCPP_INFO(this->get_logger(), "I am at: (%.2f, %.2f, %.2f), heading: %.2f",
+                                       states_mu_(0), states_mu_(1), states_mu_(2), estimated_state.yaw);
       
       ///////// Extended Kalman Filter Ends
     }
@@ -220,10 +236,15 @@ class EKF : public rclcpp::Node
 
     // EKF parameters
     double Ts_;
+    double test_;
     VectorXd states_mu_; // [x y z vx vy vz roll pitch yaw] 9*1
     MatrixXd states_sigma_; // 9*9
     MatrixXd Q_; // input noise 6*6
     MatrixXd R_; // sensor noise 9*9
+
+    // publisher
+    rclcpp::Publisher<interfaces::msg::States>::SharedPtr states_pub_;
+
 };
 
 int main(int argc, char * argv[])
