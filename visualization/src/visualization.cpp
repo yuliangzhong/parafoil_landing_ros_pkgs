@@ -8,6 +8,7 @@
 #include <tf2_ros/transform_broadcaster.h>
 
 #include <geometry_msgs/msg/transform_stamped.hpp>
+#include <visualization_msgs/msg/marker.hpp>
 #include "interfaces/msg/states.hpp"
 
 using std::placeholders::_1;
@@ -23,6 +24,11 @@ class Visualization : public rclcpp::Node
       states_sub_ = this->create_subscription<interfaces::msg::States>("estimated_states", 10, std::bind(&Visualization::states_callback, this, _1));
       static_desired_landing_frame_tf_publisher_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
       current_states_tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
+
+      x_vel_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("x_vel", 10);
+      y_vel_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("y_vel", 10);
+      z_vel_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("z_vel", 10);
+
       this->pub_static_desired_landing_frame();
     }
 
@@ -69,11 +75,36 @@ class Visualization : public rclcpp::Node
 
       // Send the transformation
       current_states_tf_broadcaster_->sendTransform(t);
+
+      visualization_msgs::msg::Marker x_vel_marker;
+      x_vel_marker.header.frame_id = "parafoil_base";
+      x_vel_marker.header.stamp = t.header.stamp;
+      x_vel_marker.type = visualization_msgs::msg::Marker::ARROW;
+      x_vel_marker.action = visualization_msgs::msg::Marker::ADD;
+      x_vel_marker.pose.position.x = 0;
+      x_vel_marker.pose.position.y = 0;
+      x_vel_marker.pose.position.z = 0;
+      x_vel_marker.pose.orientation.x = 0;
+      x_vel_marker.pose.orientation.y = 0;
+      x_vel_marker.pose.orientation.z = 0;
+      x_vel_marker.pose.orientation.w = 0;
+      x_vel_marker.scale.x = 10*msg->vx;
+      x_vel_marker.scale.y = 0.01;
+      x_vel_marker.scale.z = 0.01;
+      x_vel_marker.color.a = 1;
+      x_vel_marker.color.r = 1;
+      x_vel_marker.color.g = 0;
+      x_vel_marker.color.b = 0;
+      x_vel_pub_->publish(x_vel_marker);
     }
     
     rclcpp::Subscription<interfaces::msg::States>::SharedPtr states_sub_;
     std::shared_ptr<tf2_ros::StaticTransformBroadcaster> static_desired_landing_frame_tf_publisher_;
     std::unique_ptr<tf2_ros::TransformBroadcaster> current_states_tf_broadcaster_;
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr x_vel_pub_;
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr y_vel_pub_;
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr z_vel_pub_;
+
 };
 
 int main(int argc, char * argv[])

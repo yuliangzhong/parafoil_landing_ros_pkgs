@@ -16,6 +16,7 @@ find_package(rclcpp REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(interfaces REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 add_executable(visualization src/visualization.cpp)
 ament_target_dependencies(
@@ -25,6 +26,7 @@ ament_target_dependencies(
    tf2
    tf2_ros
    interfaces
+   visualization_msgs
 )
 
 if(BUILD_TESTING)

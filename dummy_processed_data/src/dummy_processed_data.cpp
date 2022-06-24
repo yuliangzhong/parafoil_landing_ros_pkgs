@@ -78,7 +78,7 @@ class DummyProcessedDataPub : public rclcpp::Node
     size_t publisher_timestep_in_ms_;
 
     // for testing
-    double x_vel_ = 0.1; // [m/s]
+    double x_vel_ = 0.01; // [m/s]
     double z_w_ = 0.1; // [rad/s]
 };
 
