@@ -71,7 +71,7 @@ class DummyProcessedDataPub : public rclcpp::Node
     {
         return x - floor(x/y)*y;
     }
-    
+
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Publisher<interfaces::msg::Position>::SharedPtr pos_pub_;
     rclcpp::Publisher<interfaces::msg::Velocity>::SharedPtr vel_pub_;
@@ -84,7 +84,7 @@ class DummyProcessedDataPub : public rclcpp::Node
 
     // for testing
     double x_vel_ = 0.01; // [m/s]
-    double z_w_ = 0.1; // [rad/s]
+    double z_w_ = 0.5; // [rad/s]
 };
 
 int main(int argc, char * argv[])
