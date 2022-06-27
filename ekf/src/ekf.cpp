@@ -1,10 +1,8 @@
 #include <chrono>
-#include <functional>
 #include <memory>
 #include <string>
 
-#include "rclcpp/rclcpp.hpp"
-#include "std_msgs/msg/string.hpp"
+#include <rclcpp/rclcpp.hpp>
 
 #include "interfaces/msg/position.hpp"
 #include "interfaces/msg/velocity.hpp"
@@ -21,16 +19,11 @@
 #include <eigen3/Eigen/Dense>
 #include <cmath>
 
-#include <iostream>
-using std::cout; using std::endl;
-
 using std::placeholders::_1;
 using std::placeholders::_2;
 using std::placeholders::_3;
 using std::placeholders::_4;
 using std::placeholders::_5;
-
-using namespace std::chrono_literals;
 
 using Position = interfaces::msg::Position;
 using Velocity = interfaces::msg::Velocity;
@@ -44,7 +37,7 @@ using Sync = message_filters::Synchronizer<ApproPolicy>;
 using MatrixXd = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>;
 using VectorXd = Eigen::Matrix<double, Eigen::Dynamic, 1>;
 
-#define PI 3.141592653
+#define PI 3.14159265358979323846
 
 
 class EKF : public rclcpp::Node
@@ -169,19 +162,24 @@ class EKF : public rclcpp::Node
       xp.segment(3,3) = states_mu_.segment(3,3) + Ts_*C_IB*U.segment(0,3);
       xp.segment(6,3) = states_mu_.segment(6,3) + Ts_*L*U.segment(3,3);
 
-      MatrixXd U_diag(9,3);
-      U_diag.block(0,0,3,1) = U.segment(0,3);
-      U_diag.block(3,1,3,1) = U.segment(0,3);
-      U_diag.block(6,2,3,1) = U.segment(0,3);
+      MatrixXd Ua_diag(9,3);
+      Ua_diag.block(0,0,3,1) = U.segment(0,3);
+      Ua_diag.block(3,1,3,1) = U.segment(0,3);
+      Ua_diag.block(6,2,3,1) = U.segment(0,3);
+
+      MatrixXd Uw_diag(9,3);
+      Uw_diag.block(0,0,3,1) = U.segment(3,3);
+      Uw_diag.block(3,1,3,1) = U.segment(3,3);
+      Uw_diag.block(6,2,3,1) = U.segment(3,3);
 
       A.block(0,0,3,3).setIdentity();
       A.block(0,3,3,3) = Ts_*MatrixXd::Identity(3,3);
       A.block(0,6,3,3).setZero();
       A.block(3,0,3,3).setZero();
       A.block(3,3,3,3).setIdentity();
-      A.block(3,6,3,3) = Ts_*J_C_IB*U_diag;
+      A.block(3,6,3,3) = Ts_*J_C_IB*Ua_diag;
       A.block(6,0,3,6).setZero();
-      A.block(6,6,3,3) = MatrixXd::Identity(3,3) + Ts_*J_L*U_diag;
+      A.block(6,6,3,3) = MatrixXd::Identity(3,3) + Ts_*J_L*Uw_diag;
 
       S.block(0,0,3,6).setZero();
       S.block(3,0,3,3) = Ts_*C_IB;
@@ -195,10 +193,10 @@ class EKF : public rclcpp::Node
       VectorXd z = xp;
       MatrixXd H = MatrixXd::Identity(9,9);
       MatrixXd M = MatrixXd::Identity(9,9);
-      MatrixXd K = ((H*Pp*H.transpose() + M*R_*M.transpose()).transpose().ldlt().solve((Pp*H.transpose()).transpose())).transpose();
-      // MatrixXd K = Pp*H.transpose()*(H*Pp*H.transpose() + M*R_*M.transpose()).inverse();
+      MatrixXd K_trans = (H*Pp*H.transpose() + M*R_*M.transpose()).transpose().ldlt().solve(H*Pp.transpose());
+      MatrixXd K = K_trans.transpose();
       VectorXd Dz = z_bar - z;
-      Dz(8) = fmod(Dz(8)+PI, 2*PI) - PI;
+      Dz(8) = my_mod(Dz(8) + PI, 2*PI) - PI;
 
       states_mu_ = xp + K*Dz;
       states_sigma_ = (MatrixXd::Identity(9,9) - K*H)*Pp;
@@ -213,13 +211,18 @@ class EKF : public rclcpp::Node
       estimated_state.vz = states_mu_(5);
       estimated_state.roll = states_mu_(6);
       estimated_state.pitch = states_mu_(7);
-      estimated_state.yaw = fmod(states_mu_(8)+PI, 2*PI) - PI;
+      estimated_state.yaw = my_mod(states_mu_(8) + PI, 2*PI) - PI;
       states_pub_->publish(estimated_state);
 
       RCLCPP_INFO(this->get_logger(), "I am at: (%.2f, %.2f, %.2f), heading: %.2f",
                                        states_mu_(0), states_mu_(1), states_mu_(2), estimated_state.yaw);
       
       ///////// Extended Kalman Filter Ends
+    }
+
+    double my_mod(double x, double y)
+    {
+        return x - floor(x/y)*y;
     }
 
     message_filters::Subscriber<Position> pos_sub_;
@@ -236,7 +239,6 @@ class EKF : public rclcpp::Node
 
     // EKF parameters
     double Ts_;
-    double test_;
     VectorXd states_mu_; // [x y z vx vy vz roll pitch yaw] 9*1
     MatrixXd states_sigma_; // 9*9
     MatrixXd Q_; // input noise 6*6

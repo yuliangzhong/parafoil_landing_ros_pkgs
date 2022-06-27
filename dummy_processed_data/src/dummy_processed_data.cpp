@@ -1,10 +1,9 @@
 #include <chrono>
-#include <functional>
 #include <memory>
 #include <string>
 
-#include "rclcpp/rclcpp.hpp"
-#include "std_msgs/msg/string.hpp"
+#include <rclcpp/rclcpp.hpp>
+#include <cmath>
 
 #include "interfaces/msg/position.hpp"
 #include "interfaces/msg/velocity.hpp"
@@ -12,9 +11,7 @@
 #include "interfaces/msg/body_acceleration.hpp"
 #include "interfaces/msg/body_angular_velocity.hpp"
 
-using namespace std::chrono_literals;
-
-#define PI 3.141592653
+#define PI 3.14159265358979323846
 
 
 class DummyProcessedDataPub : public rclcpp::Node
@@ -35,20 +32,23 @@ class DummyProcessedDataPub : public rclcpp::Node
     private:
     void timer_callback()
     {
+        double current_time_approx = timer_count_*publisher_timestep_in_ms_/1000; // [s]
+
         auto pos = interfaces::msg::Position();
-        pos.x = 0.0 + timer_count_*publisher_timestep_in_ms_/1000*x_vel_; 
-        pos.y = 0.0; pos.z = 0.0;
+        pos.x = 0.0; 
+        pos.y = 0.0; pos.z = -1.0;
         pos.header.stamp = this->get_clock()->now();
         pos_pub_->publish(pos);
 
         auto vel = interfaces::msg::Velocity();
-        vel.vx = x_vel_; vel.vy = 0.0; vel.vz = 0.0;
+        vel.vx = 0.0;
+        vel.vy = 0.0; vel.vz = 0.0;
         vel.header.stamp = this->get_clock()->now();
         vel_pub_->publish(vel);
 
         auto pose = interfaces::msg::Pose();
         pose.roll = 0.0; pose.pitch = 0.0; 
-        pose.yaw = fmod(0.0 + timer_count_*publisher_timestep_in_ms_/1000*z_w_ + PI, 2*PI) - PI;
+        pose.yaw = my_mod(current_time_approx*z_w_ + PI, 2*PI) - PI; // [-pi, pi)
         pose.header.stamp = this->get_clock()->now();
         pose_pub_->publish(pose);
 
@@ -62,11 +62,16 @@ class DummyProcessedDataPub : public rclcpp::Node
         body_omega.header.stamp = this->get_clock()->now();
         body_omega_pub_->publish(body_omega);
 
-        RCLCPP_INFO(this->get_logger(), "Published once");
+        RCLCPP_INFO(this->get_logger(), "Published once,  heading: %.2f", pose.yaw);
 
         ++timer_count_;
     }
 
+    double my_mod(double x, double y)
+    {
+        return x - floor(x/y)*y;
+    }
+    
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Publisher<interfaces::msg::Position>::SharedPtr pos_pub_;
     rclcpp::Publisher<interfaces::msg::Velocity>::SharedPtr vel_pub_;
