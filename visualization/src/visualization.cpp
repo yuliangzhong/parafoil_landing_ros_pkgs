@@ -42,7 +42,7 @@ class Visualization : public rclcpp::Node
       t.transform.translation.z = z;
 
       tf2::Quaternion q;
-      q.setRPY(roll, pitch, yaw); // Z-Y-X euler angle
+      q.setRPY(roll, pitch, yaw); // = Z-Y-X euler angle
       t.transform.rotation.x = q.x();
       t.transform.rotation.y = q.y();
       t.transform.rotation.z = q.z();
@@ -61,38 +61,32 @@ class Visualization : public rclcpp::Node
       m.pose.position.z = 0;
       auto q_inv = tf2::Quaternion(t.transform.rotation.x, t.transform.rotation.y, 
                                    t.transform.rotation.z, t.transform.rotation.w).inverse();
-      // m.pose.orientation.x = 0;
-      // m.pose.orientation.y = 0;
-      // m.pose.orientation.z = 0;
-      // m.pose.orientation.w = 1;
+      tf2::Quaternion q_rot;
+
       m.scale.x = scale;
       m.scale.y = 0.01;
       m.scale.z = 0.01;
-      m.color.a = 1;
       if (axis == 'x')
       {
         m.color.r = 1;  m.color.g = 0;  m.color.b = 0;
-        m.pose.orientation.x = q_inv.x(); m.pose.orientation.y = q_inv.y();
-        m.pose.orientation.z = q_inv.z(); m.pose.orientation.w = q_inv.w();
+        q_rot = q_inv;
       }
       else if (axis == 'y')
       {
-        tf2::Quaternion q_rot;
-        q_rot.setRPY(0, 0, PI/2);
-        auto q_y = q_rot*q_inv;
         m.color.r = 0;  m.color.g = 1;  m.color.b = 0;
-        m.pose.orientation.x = q_y.x(); m.pose.orientation.y = q_y.y();
-        m.pose.orientation.z = q_y.z(); m.pose.orientation.w = q_y.w();
+        // q_rot = (tf::Matrix3x3(q_inv)*tf::Matrix3x3(tf2::Quaternion(0, 0, sqrt(2), sqrt(2))));
+        q_rot = q_inv*tf2::Quaternion(0, 0, sqrt(2), sqrt(2));
       }
       else
       {
-        tf2::Quaternion q_rot;
-        q_rot.setRPY(0, 3*PI/2, 0);
-        auto q_z = q_rot*q_inv;
         m.color.r = 0;  m.color.g = 0;  m.color.b = 1;
-        m.pose.orientation.x = q_z.x(); m.pose.orientation.y = q_z.y();
-        m.pose.orientation.z = q_z.z(); m.pose.orientation.w = q_z.w();
+        q_rot = q_inv*tf2::Quaternion(0, -sqrt(2), 0, sqrt(2));
       }
+      m.color.a = 1;
+      m.pose.orientation.x = q_rot.x(); 
+      m.pose.orientation.y = q_rot.y();
+      m.pose.orientation.z = q_rot.z(); 
+      m.pose.orientation.w = q_rot.w();
       return m;
     }
 
