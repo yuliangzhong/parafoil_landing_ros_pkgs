@@ -32,17 +32,19 @@ class DummyProcessedDataPub : public rclcpp::Node
     private:
     void timer_callback()
     {
-        double current_time_approx = timer_count_*publisher_timestep_in_ms_/1000; // [s]
+        double current_time_approx = static_cast<double>(timer_count_)*static_cast<double>(publisher_timestep_in_ms_)/1000; // [s]
 
         auto pos = interfaces::msg::Position();
-        pos.x = 0.0; 
-        pos.y = 0.0; pos.z = -1.0;
+        pos.x = 0.5*cos(current_time_approx*z_w_); 
+        pos.y = 0.5*sin(current_time_approx*z_w_); 
+        pos.z = -1.0;
         pos.header.stamp = this->get_clock()->now();
         pos_pub_->publish(pos);
 
         auto vel = interfaces::msg::Velocity();
-        vel.vx = 0.0;
-        vel.vy = 0.0; vel.vz = 0.0;
+        vel.vx = -0.5*z_w_*sin(current_time_approx*z_w_);
+        vel.vy = 0.5*z_w_*cos(current_time_approx*z_w_);
+        vel.vz = 0.0;
         vel.header.stamp = this->get_clock()->now();
         vel_pub_->publish(vel);
 
@@ -53,7 +55,7 @@ class DummyProcessedDataPub : public rclcpp::Node
         pose_pub_->publish(pose);
 
         auto body_acc = interfaces::msg::BodyAcceleration();
-        body_acc.ax = 0.0; body_acc.ay = 0.0; body_acc.az = 0.0;
+        body_acc.ax = -z_w_*z_w_*0.5; body_acc.ay = 0.0; body_acc.az = 0.0;
         body_acc.header.stamp = this->get_clock()->now();
         body_acc_pub_->publish(body_acc);
 
@@ -62,7 +64,7 @@ class DummyProcessedDataPub : public rclcpp::Node
         body_omega.header.stamp = this->get_clock()->now();
         body_omega_pub_->publish(body_omega);
 
-        RCLCPP_INFO(this->get_logger(), "Published once,  heading: %.2f", pose.yaw);
+        RCLCPP_INFO(this->get_logger(), "Published once,  heading: %.3f, timer_count: %.1f", pose.yaw, static_cast<double>(timer_count_));
 
         ++timer_count_;
     }
@@ -83,8 +85,7 @@ class DummyProcessedDataPub : public rclcpp::Node
     size_t publisher_timestep_in_ms_;
 
     // for testing
-    double x_vel_ = 0.01; // [m/s]
-    double z_w_ = 0.5; // [rad/s]
+    double z_w_ = 0.1; // [rad/s]
 };
 
 int main(int argc, char * argv[])

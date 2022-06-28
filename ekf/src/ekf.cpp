@@ -214,7 +214,7 @@ class EKF : public rclcpp::Node
       estimated_state.yaw = my_mod(states_mu_(8) + PI, 2*PI) - PI;
       states_pub_->publish(estimated_state);
 
-      RCLCPP_INFO(this->get_logger(), "I am at: (%.2f, %.2f, %.2f), heading: %.2f",
+      RCLCPP_INFO(this->get_logger(), "I am at: (%.3f, %.3f, %.3f), heading: %.3f",
                                        states_mu_(0), states_mu_(1), states_mu_(2), estimated_state.yaw);
       
       ///////// Extended Kalman Filter Ends

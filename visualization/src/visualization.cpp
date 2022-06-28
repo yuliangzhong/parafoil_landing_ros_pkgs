@@ -74,13 +74,12 @@ class Visualization : public rclcpp::Node
       else if (axis == 'y')
       {
         m.color.r = 0;  m.color.g = 1;  m.color.b = 0;
-        // q_rot = (tf::Matrix3x3(q_inv)*tf::Matrix3x3(tf2::Quaternion(0, 0, sqrt(2), sqrt(2))));
-        q_rot = q_inv*tf2::Quaternion(0, 0, sqrt(2), sqrt(2));
+        q_rot = q_inv*tf2::Quaternion(0, 0, sqrt(2)/2, sqrt(2)/2);
       }
       else
       {
         m.color.r = 0;  m.color.g = 0;  m.color.b = 1;
-        q_rot = q_inv*tf2::Quaternion(0, -sqrt(2), 0, sqrt(2));
+        q_rot = q_inv*tf2::Quaternion(0, -sqrt(2)/2, 0, sqrt(2)/2);
       }
       m.color.a = 1;
       m.pose.orientation.x = q_rot.x(); 
@@ -105,16 +104,11 @@ class Visualization : public rclcpp::Node
       t.header.frame_id = "desired_landing_frame";
       t.child_frame_id = "parafoil_base";
       set_transform(t, msg->x, msg->y, msg->z, msg->roll, msg->pitch, msg->yaw);
-
-      // x_vel_pub_->publish(create_marker(t, msg->vx, 0.01, 0.01));
-      // y_vel_pub_->publish(create_marker(t, 0.01, msg->vy, 0.01));
-      // z_vel_pub_->publish(create_marker(t, 0.01, 0.01, msg->vz));
-      x_vel_pub_->publish(create_marker(t, 'x', 1));
-      y_vel_pub_->publish(create_marker(t, 'y', 1));
-      z_vel_pub_->publish(create_marker(t, 'z', 1));
-
       current_states_tf_broadcaster_->sendTransform(t);
 
+      x_vel_pub_->publish(create_marker(t, 'x', 15*msg->vx));
+      y_vel_pub_->publish(create_marker(t, 'y', 15*msg->vy));
+      z_vel_pub_->publish(create_marker(t, 'z', 15*msg->vz));
     }
     
     rclcpp::Subscription<interfaces::msg::States>::SharedPtr states_sub_;
