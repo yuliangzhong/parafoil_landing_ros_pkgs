@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<robot name="parafoil">
+  <link name="parafoil_base">
+    <visual>
+        <origin rpy="0.0 0 0" xyz="0 0 0"/>
+        <geometry>
+            <mesh filename="package://visualization/description/parafoil_model.stl"/>
+        </geometry>
+        <material name="white">
+            <color rgba="1 1 1 1"/>
+        </material>
+    </visual>
+  </link>
+</robot>

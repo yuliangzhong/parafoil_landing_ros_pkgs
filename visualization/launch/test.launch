@@ -1,0 +1,5 @@
+ <launch>
+    <node pkg="robot_state_publisher" exec="robot_state_publisher" name="robot_state_publisher" namespace="robot_state_publisher">
+        <param name="robot_description" value="package://visualization/description/parafoil_model.urdf.xml"/>
+    </node>
+ </launch>
