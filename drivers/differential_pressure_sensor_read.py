@@ -7,6 +7,8 @@ P_MIN = -P_MAX
 DP = 1
 DT = 5
 
+PSI_TO_Pa = 6894.75729
+
 def PrintStatusInfo(status):
     if (status == 0):
         print("Normal operation. Good data packet")
@@ -33,6 +35,8 @@ if __name__ == '__main__':
     # Get I2C bus
     bus = smbus.SMBus(1)
 
+    air_density = 1.16 # [kg/m3]
+
     while(True):
         status1, pressure1, temperature1 = GetData(bus)
         status2, pressure2, temperature2 = GetData(bus)
@@ -46,9 +50,11 @@ if __name__ == '__main__':
         if (abs(pressure1 - pressure2) > DP or abs(temperature1 - temperature2) > DT):
             print("WARNING: two data bags don't match")
         
-        pressure = (pressure1 + pressure2 )/2
+        pressure = (pressure1 + pressure2 )/2 * PSI_TO_Pa
         temperature = (temperature1 + temperature2 )/2
-        print("The pressure is %.5f [psi]" %pressure)
+
+        vel = (2*abs(pressure)/air_density)**0.5
+        print("The velocity is %.5f [m/s]. The pressure is %.5f [Pa]" %(vel, pressure))
         # print("The temperature is %.1f [C*]" %temperature)
         time.sleep(0.1)
 
