@@ -10,6 +10,12 @@ import numpy as np
 
 SENSOR_ADDR = 0x77
 
+SEA_LEVEL_P = 1013.25 # [mbar/hPa]
+GAS_CONST = 8.31432 # [Nm/mol/K]
+GRAVITY_ACC = 9.80665 # [N/kg]
+MOLAR_MASS_EARTH_AIR = 0.0289644 # [kg/mol]
+STD_TEMP_LAPSE_RATE = 0.0065 # [K/m]
+
 def GetData(bus, OSR):
 
     # Read 12 bytes of calibration data
@@ -114,25 +120,37 @@ if __name__ == '__main__':
     # # MS5611_01BXXX address, SENSOR_ADDR(119)
     # # 0x1E(30) Reset command
     bus.write_byte(SENSOR_ADDR, 0x1E)
-    time.sleep(0.2)
+    time.sleep(0.1)
 
-    len = 10
-    warm_up_pressure, _ = GetData(bus, 256)
+    len = 5
+    warm_up_pressure, warm_up_temp = GetData(bus, 256)
     pressure_buffer = warm_up_pressure * np.ones(len)
+    temp_buffer = warm_up_temp * np.ones(len)
 
     count = 0
+    last_h = 0
 
     while(True):
         count += 1
         # Get data
-        pressure, _ = GetData(bus, 1024)
+        pressure, temperature = GetData(bus, 1024)
         # Update buffer
         pressure_buffer[:-1] = pressure_buffer[1:]
         pressure_buffer[-1] = pressure
+        temp_buffer[:-1] = temp_buffer[1:]
+        temp_buffer[-1] = temperature
         # get measurement
         filtered_pressure = np.mean(pressure_buffer)
-        print("Pressure : %.4f mbar" %filtered_pressure)
+        filtered_temp = np.mean(temp_buffer)
+        # calculate absolute altitude
+        h = ((SEA_LEVEL_P / filtered_pressure)**(GAS_CONST*STD_TEMP_LAPSE_RATE/GRAVITY_ACC/MOLAR_MASS_EARTH_AIR) -1) * (filtered_temp+273.15) / STD_TEMP_LAPSE_RATE
+        print("Absolute height: %.1f m, Pressure : %.4f mbar, Temperature: %.2f *C" %(h, filtered_pressure, filtered_temp))
+        
         # plot
-        plt.plot([count-1, count], pressure_buffer[-2:], color='red')
-        plt.pause(0.001)
+        if count>len:
+            plt.plot([count-1, count], [last_h, h], color='red')
+            plt.pause(0.001)
+        
+        last_h = h 
+
         time.sleep(0.1)        
