@@ -52,6 +52,13 @@ if __name__ == '__main__':
         # print("The temperature is %.1f [C*]" %temperature)
         time.sleep(0.1)
 
+# Documentation
+# Data Structure Definition: [Page 15] https://www.sensorway.cn/Upload/2011/1/129388649843437500.pdf
+# Status Definition: https://www.azosensors.com/article.aspx?ArticleID=182
+# Reading Transfer Equation: [Page 5] https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=MS4525DO&DocType=DS&DocLang=English
+# Code Reference: https://github.com/ArduPilot/ardupilot/blob/5f8733532544a9a73cc6742ee3b21282ba8929eb/libraries/AP_Airspeed/AP_Airspeed_MS4525.cpp
+#                 https://github.com/PX4/PX4-Autopilot/blob/main/src/drivers/differential_pressure/ms4525do/MS4525DO.cpp
+
 
 
 
