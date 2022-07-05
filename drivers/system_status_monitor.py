@@ -1,65 +1,62 @@
 from smbus2 import SMBus, i2c_msg
 import time
 
-RESET = 0b00000110
-START_SYNC = 0b00001000
-WREG = 0b01000000
-RDATA = 0b00010000
-CONFIG = 0b10000010
+#########################
+# SensorName: ADS1219IPWR
+# Interface: I2C
+#########################
 
+# $ sudo i2cdetect -y 1
 SENSOR_ADDR = 0x45
 
-bus = SMBus(1, True)
+# Command byte definition
+RESET = 0b00000110
+START_SYNC = 0b00001000
+RDATA = 0b00010000
+WREG = 0b01000000
 
-# reset sensor
-bus.write_byte(SENSOR_ADDR, RESET)
-time.sleep(0.0001)
+# Register configuration
+# | MUX(3) | GAIN(1) | DR(2) | CM(1) | VREF(1) |
+CONFIG = 0b10000010
+V_REF = 2.048 # [V]
 
+if __name__ == '__main__':    
 
-# start/restart conversions
-bus.write_byte(SENSOR_ADDR, START_SYNC)
-time.sleep(0.0001)
+    bus = SMBus(1)
 
+    # reset sensor
+    bus.write_byte(SENSOR_ADDR, RESET)
+    time.sleep(0.001)
 
-# write configuration register
-# bus.write_byte(SENSOR_ADDR, 0b01000000)
-# time.sleep(0.0001)
-bus.write_byte_data(SENSOR_ADDR, WREG , CONFIG)
-time.sleep(0.0001)
-
-# start/restart conversions
-bus.write_byte(SENSOR_ADDR, START_SYNC)
-time.sleep(0.1)
-
-
-# write = i2c_msg.write(SENSOR_ADDR, [CONFIG, RDATA])
-write = i2c_msg.write(SENSOR_ADDR, [RDATA])
-read = i2c_msg.read(SENSOR_ADDR, 3)
-bus.i2c_rdwr(write, read)
-data = list(read)
-
-print(data)
-
-num = (data[0]<<16)+(data[1]<<8)+data[2]
-print(num)
-print(type(num))
-
-volt = num*2.048/(2**23)
-print(volt)
-
-R1 = 2*499
-R2 = 71.5
-Vs = volt*(R1+R2)/R2
-print("Battary voltage: ", Vs)
+    # start/restart conversions
+    bus.write_byte(SENSOR_ADDR, START_SYNC)
+    time.sleep(0.001)
 
 
-# data = bus.read_i2c_block_data(SENSOR_ADDR,RDATA, 3)
-# # bus.write_byte(SENSOR_ADDR, RDATA)
-# # time.sleep(0.0001)
-# # data= bus.read_block_data(SENSOR_ADDR, RDATA)
+    # write register configuration
+    bus.write_byte_data(SENSOR_ADDR, WREG, CONFIG)
+    time.sleep(0.001)
 
-# [0,0,0]
+    # start/restart conversions
+    bus.write_byte(SENSOR_ADDR, START_SYNC)
+    time.sleep(0.1)
 
-# print(data)
+    try:
+        while(True):
+            write = i2c_msg.write(SENSOR_ADDR, [RDATA])
+            read = i2c_msg.read(SENSOR_ADDR, 3)
+            bus.i2c_rdwr(write, read)
+            volt_data = list(read)
 
-# if __name__ == '__main__':
+            volt_count = (volt_data[0] << 16) + (volt_data[1] <<8 ) + volt_data[2]
+            volt = volt_count * V_REF / (2**23)
+
+            R1 = 2*499  # Resistance1 --X--X--, X = 499 [Ohm]
+            R2 = 71.5   # Resistance2 --X--   , X = 71.5 [Ohm]
+            Vs = volt / R2 * (R1+R2)
+            print("Current battary voltage: %.2f [V]" %Vs)
+
+            time.sleep(0.5)
+
+    except KeyboardInterrupt:
+        pass
