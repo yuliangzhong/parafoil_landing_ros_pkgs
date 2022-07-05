@@ -1,15 +1,17 @@
-# source code from 
-# http://www.pibits.net/code/raspberry-pi-and-ms5611-barometric-pressure-sensor-example.php
-# datasheet
-# MS5611-01BA03
-
 import smbus
 import time
 import matplotlib.pyplot as plt
 import numpy as np
 
+#########################
+# SensorName: MS5611-01BA03
+# Interface: I2C
+#########################
+
+# $ sudo i2cdetect -y 1
 SENSOR_ADDR = 0x77
 
+# Define constants
 SEA_LEVEL_P = 1013.25 # [mbar/hPa]
 GAS_CONST = 8.31432 # [Nm/mol/K]
 GRAVITY_ACC = 9.80665 # [N/kg]
@@ -21,22 +23,22 @@ def GetData(bus, OSR):
     # Read 12 bytes of calibration data
     # Read pressure sensitivity
     data = bus.read_i2c_block_data(SENSOR_ADDR, 0xA2, 2)
-    C1 = data[0] * 256 + data[1]
+    C1 = (data[0] << 8) + data[1]
     # Read pressure offset
     data = bus.read_i2c_block_data(SENSOR_ADDR, 0xA4, 2)
-    C2 = data[0] * 256 + data[1]
+    C2 = (data[0] << 8) + data[1]
     # Read temperature coefficient of pressure sensitivity
     data = bus.read_i2c_block_data(SENSOR_ADDR, 0xA6, 2)
-    C3 = data[0] * 256 + data[1]
+    C3 = (data[0] << 8) + data[1]
     # Read temperature coefficient of pressure offset
     data = bus.read_i2c_block_data(SENSOR_ADDR, 0xA8, 2)
-    C4 = data[0] * 256 + data[1]
+    C4 = (data[0] << 8) + data[1]
     # Read reference temperature
     data = bus.read_i2c_block_data(SENSOR_ADDR, 0xAA, 2)
-    C5 = data[0] * 256 + data[1]
+    C5 = (data[0] << 8) + data[1]
     # Read temperature coefficient of the temperature
     data = bus.read_i2c_block_data(SENSOR_ADDR, 0xAC, 2)
-    C6 = data[0] * 256 + data[1]
+    C6 = (data[0] << 8) + data[1]
 
     # print("coefficients C1~C6: ", C1, C2, C3, C4, C5, C6)
 
@@ -64,24 +66,22 @@ def GetData(bus, OSR):
         pass # by default: OSR = 256
 
     # MS5611_01BXXX address, 0x77(119)
-    # 0x40(64) Pressure conversion(OSR = 256) command
     bus.write_byte(SENSOR_ADDR, D1_addr)
     time.sleep(D_ts)
     # Read digital pressure value
     # Read data back from 0x00(0), 3 bytes
     # D1 MSB2, D1 MSB1, D1 LSB
     value = bus.read_i2c_block_data(SENSOR_ADDR, 0x00, 3)
-    D1 = value[0] * 65536 + value[1] * 256 + value[2]
+    D1 = (value[0] << 16) + (value[1] << 8) + value[2]
 
     # MS5611_01BXXX address, 0x77(119)
-    # 0x50(80) Temperature conversion(OSR = 256) command
     bus.write_byte(SENSOR_ADDR, D2_addr)
     time.sleep(D_ts)
     # Read digital temperature value
     # Read data back from 0x00(0), 3 bytes
     # D2 MSB2, D2 MSB1, D2 LSB
     value = bus.read_i2c_block_data(SENSOR_ADDR, 0x00, 3)
-    D2 = value[0] * 65536 + value[1] * 256 + value[2]
+    D2 = (value[0] << 16) + (value[1] << 8) + value[2]
 
     # print("coefficients D1, D2: ", D1, D2)
 
@@ -130,27 +130,38 @@ if __name__ == '__main__':
     count = 0
     last_h = 0
 
-    while(True):
-        count += 1
-        # Get data
-        pressure, temperature = GetData(bus, 1024)
-        # Update buffer
-        pressure_buffer[:-1] = pressure_buffer[1:]
-        pressure_buffer[-1] = pressure
-        temp_buffer[:-1] = temp_buffer[1:]
-        temp_buffer[-1] = temperature
-        # get measurement
-        filtered_pressure = np.mean(pressure_buffer)
-        filtered_temp = np.mean(temp_buffer)
-        # calculate absolute altitude
-        h = ((SEA_LEVEL_P / filtered_pressure)**(GAS_CONST*STD_TEMP_LAPSE_RATE/GRAVITY_ACC/MOLAR_MASS_EARTH_AIR) -1) * (filtered_temp+273.15) / STD_TEMP_LAPSE_RATE
-        print("Absolute height: %.1f m, Pressure : %.4f mbar, Temperature: %.2f *C" %(h, filtered_pressure, filtered_temp))
-        
-        # plot
-        if count>len:
-            plt.plot([count-1, count], [last_h, h], color='red')
-            plt.pause(0.001)
-        
-        last_h = h 
+    try:
+        while(True):
+            count += 1
 
-        time.sleep(0.1)        
+            # Get data
+            pressure, temperature = GetData(bus, 1024)
+
+            # Update buffer
+            pressure_buffer[:-1] = pressure_buffer[1:]
+            pressure_buffer[-1] = pressure
+            temp_buffer[:-1] = temp_buffer[1:]
+            temp_buffer[-1] = temperature
+
+            # get measurement
+            filtered_pressure = np.mean(pressure_buffer)
+            filtered_temp = np.mean(temp_buffer)
+
+            # calculate absolute altitude
+            h = ((SEA_LEVEL_P / filtered_pressure)**(GAS_CONST*STD_TEMP_LAPSE_RATE/GRAVITY_ACC/MOLAR_MASS_EARTH_AIR) -1) * (filtered_temp+273.15) / STD_TEMP_LAPSE_RATE
+            print("Absolute height: %.1f m, Pressure : %.4f mbar, Temperature: %.2f *C" %(h, filtered_pressure, filtered_temp))
+            
+            # plot
+            if count>len:
+                plt.plot([count-1, count], [last_h, h], color='red')
+                plt.pause(0.001)
+            
+            last_h = h 
+
+            time.sleep(0.1)
+
+    except KeyboardInterrupt:
+        pass
+
+# code reference 
+# http://www.pibits.net/code/raspberry-pi-and-ms5611-barometric-pressure-sensor-example.php

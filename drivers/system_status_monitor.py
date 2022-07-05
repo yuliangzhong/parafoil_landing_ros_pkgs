@@ -18,6 +18,7 @@ WREG = 0b01000000
 # Register configuration
 # | MUX(3) | GAIN(1) | DR(2) | CM(1) | VREF(1) |
 CONFIG = 0b10000010
+GAIN = 1
 V_REF = 2.048 # [V]
 
 if __name__ == '__main__':    
@@ -49,7 +50,7 @@ if __name__ == '__main__':
             volt_data = list(read)
 
             volt_count = (volt_data[0] << 16) + (volt_data[1] <<8 ) + volt_data[2]
-            volt = volt_count * V_REF / (2**23)
+            volt = volt_count * V_REF / GAIN / (2**23)
 
             R1 = 2*499  # Resistance1 --X--X--, X = 499 [Ohm]
             R2 = 71.5   # Resistance2 --X--   , X = 71.5 [Ohm]
