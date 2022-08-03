@@ -43,7 +43,7 @@ bool bmi088_init(struct BMI088 *bmi) {
     int8_t rslt;
 
     if ((rslt = bmi08a_init(&bmi->_dev)) != BMI08X_OK) {
-        printf("Failed to initialize accelerometer!\n");
+        printf("Failed to initialize accelerometer! error code %d\n", rslt);
         return false;
     }
 

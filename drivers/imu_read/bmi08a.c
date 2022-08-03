@@ -44,6 +44,7 @@
 /**\name        Header files
  ****************************************************************************/
 #include "bmi08x.h"
+#include <cstdio>
 
 /****************************************************************************/
 
@@ -750,6 +751,7 @@ int8_t bmi08a_init(struct bmi08x_dev *dev)
 
     /* Check for null pointer in the device structure */
     rslt = null_ptr_check(dev);
+    printf("result after nullptr check: %d\n", rslt);
 
     /* Proceed if null check is fine */
     if (rslt == BMI08X_OK)
@@ -761,6 +763,7 @@ int8_t bmi08a_init(struct bmi08x_dev *dev)
 
             /* Dummy read of Chip-ID in SPI mode */
             rslt = get_regs(BMI08X_REG_ACCEL_CHIP_ID, &chip_id, 1, dev);
+            printf("result after dummy check: %d\n", rslt);
         }
         else
         {
@@ -2054,6 +2057,7 @@ static int8_t get_regs(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, struct
         {
             /* Updating the data buffer */
             reg_data[index] = temp_buff[index + dev->dummy_byte];
+            printf("%d, ",reg_data[index]);
         }
     }
     else
