@@ -1,8 +1,10 @@
+import copy
 import numpy as np
 from numpy import dot, float64
 from random import randint
 from math import pi, sin, cos, sqrt, atan, atan2, asin
 import matplotlib.pyplot as plt
+from mpl_toolkits import mplot3d
 
 ##### Definition #####
 # rpy: roll, pitch, yaw. Sequence: yaw-pitch-roll
@@ -110,13 +112,15 @@ cD = [c_D0, c_Da2, c_Dds] # drag force coefficients
 cM = [c_lp, c_lda, c_m0, c_ma, c_mq, c_nr, c_nda] # moment coefficients
 
 
+fig = plt.figure()
+ax = plt.axes(projection='3d')
 
 class Simulator(object):
     def __init__(self):
         self.if_stop = 0
 
         self.cnt = 1
-        self.rand_int = 100
+        self.rand_int = 50
         self.current_wind = np.zeros((3,1), dtype=float64)
 
         # position, quaternion, velocity, angular velocity in the initial(ground) frame
@@ -125,8 +129,12 @@ class Simulator(object):
         self.vel = dot(quat2matrix(self.quat), np.array([3.819, -0.673, 1.62], dtype=float64).reshape(-1,1))
         self.ang_vel = np.zeros((3,1), dtype=float64)
 
+        self.body_acc = np.zeros((3,1), dtype=float64)
+
         self.delta_l = 0.5 # [0,1]
         self.delta_r = 0.5 # [0,1]
+
+        self.plot_buffer = None # x, y, z
     
     def print_status(self):
         print("-----")
@@ -141,21 +149,25 @@ class Simulator(object):
         self.delta_r = max(0, min(1, msg.data.x))
         self.delta_l = max(0, min(1, msg.data.y))
     
-    # def wind_generator(self):
-    #     if self.cnt % self.rand_int > self.rand_int - 5:
-    #         self.current_wind = np.random.multivariate_normal([0,0,0], [[1,0,0],[0,1,0],[0,0,0]], 1).reshape(-1,1)
-    #         self.rand_int = randint(100, 250)
-    #     if self.cnt > 1e9:
-    #         self.cnt = 1
+    def wind_generator(self):
+        if self.cnt % self.rand_int > self.rand_int - 5:
+            self.current_wind = np.random.multivariate_normal([0,0,0], [[1,0,0],[0,1,0],[0,0,0]], 1).reshape(-1,1)
+            self.rand_int = randint(100, 250)
+        if self.cnt > 1e9:
+            self.cnt = 1
 
     def sim_step_forward(self):
 
+        ##### check if landed #####
         if self.pos[2] > 0:
             self.if_stop = 1
             print("system landed at %.2f[m], %.2f[m]" % (self.pos[0], self.pos[1]))
             return
+
+        # butter worth 2/4/6 order play with cutpff 2~10 Hz omega_c
         
         self.cnt += 1
+        # self.wind_generator()
 
         C_IB = quat2matrix(self.quat)
         I_ground = dot(dot(C_IB, system_inertia), C_IB.T)
@@ -214,25 +226,47 @@ class Simulator(object):
         B_F = B_F_a + B_G
         B_M = B_M_a
         
+        self.body_acc = B_F/system_mass
+
         ##### calculate system states by symplectic Euler method #####
         ##### x_n+1 = x_n + dT * v_n        #####
         ##### v_n+1 = v_n + dT * F(x_n+1)/M ##### <----
         self.vel += dT/system_mass*dot(C_IB, B_F)
-        self.ang_vel += dT*(dot(np.linalg.inv(I_ground),dot(C_IB, B_M)) - cross_product(self.ang_vel, dot(I_ground, self.ang_vel)))
+        self.ang_vel += dT*(dot(I_ground_inv, dot(C_IB, B_M)) - cross_product(self.ang_vel, dot(I_ground, self.ang_vel)))
 
 
     def sensor_pub(self):
-        pass
+        # /position --> publish(self.pos)
+        # /body_acc --> publish(self.body_acc)
+        # /body_ang_vel --> publish(dot(quat2matrix(self.quat).T, self.ang_vel))
+
         # add sensor noise, publish it
+        pass
 
 
 if __name__ == '__main__':
     sim = Simulator()
     sim_time = 30 #[s]
 
+    pos_x_buffer = []
+    pos_y_buffer = []
+    pos_h_buffer = []
+
+
+
     for i in range(int(sim_time/dT)):
         sim.sim_step_forward()
+        pos_x_buffer.append(copy.copy(sim.pos[0]))
+        pos_y_buffer.append(copy.copy(sim.pos[1]))
+        pos_h_buffer.append(copy.copy(-sim.pos[2]))
+        sim.print_status()
         if sim.if_stop:
             break
     
-    sim.print_status()
+
+    ax.scatter3D(pos_y_buffer, pos_x_buffer, pos_h_buffer, color='red', s=10, alpha=0.5)
+    ax.set_xlabel('y+ East')
+    ax.set_ylabel('x+ North')
+    ax.set_zlabel('h+ Height')
+
+    plt.show()
