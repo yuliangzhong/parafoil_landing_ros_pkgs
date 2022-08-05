@@ -1,7 +1,7 @@
 import numpy as np
 from numpy import dot, float64
 from random import randint
-from math import pi, sin, cos, tan, sqrt, atan, atan2, asin
+from math import pi, sin, cos, sqrt, atan, atan2, asin
 import matplotlib.pyplot as plt
 
 ##### Definition #####
@@ -69,8 +69,6 @@ gravity_acc = + 9.81 # z-down
 # system constant
 system_mass = 2.2
 system_inertia = np.array([[1.68, 0, 0.09], [0, 0.80, 0], [0.09, 0, 0.32]]) # in body frame
-# system_inertia = np.eye(3) # in body frame
-# system_inertia_inv = np.eye(3)
 system_inertia_inv = np.array([[640./1059., 0, -60./353.], [0, 5./4., 0], [-60./353., 0, 1120./353.]]) # in body frame
 
 parafoil_ref_area = 1.5 # m2
@@ -115,6 +113,8 @@ cM = [c_lp, c_lda, c_m0, c_ma, c_mq, c_nr, c_nda] # moment coefficients
 
 class Simulator(object):
     def __init__(self):
+        self.if_stop = 0
+
         self.cnt = 1
         self.rand_int = 100
         self.current_wind = np.zeros((3,1), dtype=float64)
@@ -132,8 +132,9 @@ class Simulator(object):
         print("-----")
         print("pos: ", self.pos.reshape(-1))
         print("vel: ", self.vel.reshape(-1))
-        print("quat: ", self.quat.reshape(-1))
-        print("omega: ", self.ang_vel.reshape(-1))
+        print("rpy: ", matrix2rpy(quat2matrix(self.quat)).reshape(-1))
+        print("pqr: ", dot(quat2matrix(self.quat).T, self.ang_vel).reshape(-1))
+        print("current wind: ", self.current_wind.reshape(-1))
         print("count: ", self.cnt)
         
     def action_callback(self, msg):
@@ -143,11 +144,17 @@ class Simulator(object):
     # def wind_generator(self):
     #     if self.cnt % self.rand_int > self.rand_int - 5:
     #         self.current_wind = np.random.multivariate_normal([0,0,0], [[1,0,0],[0,1,0],[0,0,0]], 1).reshape(-1,1)
-    #         self.rand_int = randint(100, 1000)
+    #         self.rand_int = randint(100, 250)
     #     if self.cnt > 1e9:
     #         self.cnt = 1
 
     def sim_step_forward(self):
+
+        if self.pos[2] > 0:
+            self.if_stop = 1
+            print("system landed at %.2f[m], %.2f[m]" % (self.pos[0], self.pos[1]))
+            return
+        
         self.cnt += 1
 
         C_IB = quat2matrix(self.quat)
@@ -161,7 +168,6 @@ class Simulator(object):
         nm = np.linalg.norm(self.ang_vel)
 
         if nm > 1e-10:
-            # print("nm = ", nm)
             q_tmp0 = cos(dT*nm/2)
             q_tmph = sin(dT*nm/2)/nm*self.ang_vel
             q_tmp = np.vstack((np.array([[q_tmp0]]), q_tmph))
@@ -207,22 +213,12 @@ class Simulator(object):
 
         B_F = B_F_a + B_G
         B_M = B_M_a
-
-        # # for debugging
-        # B_F = np.array([0.2086225,   2.03626621, -1.24894524]).reshape(-1,1)
-        # B_M = np.array([1.98817463, -5.57137594,  0.        ]).reshape(-1,1)
         
         ##### calculate system states by symplectic Euler method #####
         ##### x_n+1 = x_n + dT * v_n        #####
         ##### v_n+1 = v_n + dT * F(x_n+1)/M ##### <----
         self.vel += dT/system_mass*dot(C_IB, B_F)
-
-        I_M = dot(C_IB, B_M)
-        cs = cross_product(self.ang_vel, dot(I_ground, self.ang_vel))
-        self.ang_vel += dT * (dot(I_ground_inv, I_M) - cs)
-        # self.ang_vel += dT * dot(I_ground_inv, I_M - cs)
-        # self.ang_vel += dT*(dot(np.linalg.inv(I_ground),dot(C_IB, B_M)) - cross_product(self.ang_vel, dot(I_ground, self.ang_vel)))
-        # self.ang_vel += dT*dot(np.linalg.inv(I_ground), dot(C_IB, B_M) - cross_product(self.ang_vel, dot(I_ground, self.ang_vel)))
+        self.ang_vel += dT*(dot(np.linalg.inv(I_ground),dot(C_IB, B_M)) - cross_product(self.ang_vel, dot(I_ground, self.ang_vel)))
 
 
     def sensor_pub(self):
@@ -232,9 +228,11 @@ class Simulator(object):
 
 if __name__ == '__main__':
     sim = Simulator()
-    for i in range(2000):
-        
+    sim_time = 30 #[s]
+
+    for i in range(int(sim_time/dT)):
         sim.sim_step_forward()
-        # plt.plot([count-1, count], [last_h, h], color='red')
-        # plt.pause(0.001)
+        if sim.if_stop:
+            break
+    
     sim.print_status()
