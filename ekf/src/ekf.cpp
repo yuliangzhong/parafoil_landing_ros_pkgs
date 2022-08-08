@@ -4,12 +4,8 @@
 
 #include <rclcpp/rclcpp.hpp>
 
-#include "interfaces/msg/position.hpp"
-#include "interfaces/msg/velocity.hpp"
-#include "interfaces/msg/pose.hpp"
-#include "interfaces/msg/body_acceleration.hpp"
-#include "interfaces/msg/body_angular_velocity.hpp"
 #include "interfaces/msg/states.hpp"
+#include "geometry_msgs/msg/vector3_stamped.hpp"
 
 #include "message_filters/subscriber.h"
 #include "message_filters/time_synchronizer.h"
@@ -22,16 +18,9 @@
 using std::placeholders::_1;
 using std::placeholders::_2;
 using std::placeholders::_3;
-using std::placeholders::_4;
-using std::placeholders::_5;
 
-using Position = interfaces::msg::Position;
-using Velocity = interfaces::msg::Velocity;
-using Pose = interfaces::msg::Pose;
-using Acc = interfaces::msg::BodyAcceleration;
-using Omega = interfaces::msg::BodyAngularVelocity;
-
-using ApproPolicy = message_filters::sync_policies::ApproximateTime<Position, Velocity, Pose, Acc, Omega>;
+using Vector3Stamped = geometry_msgs::msg::Vector3Stamped;
+using ApproPolicy = message_filters::sync_policies::ApproximateTime<Vector3Stamped, Vector3Stamped, Vector3Stamped>;
 using Sync = message_filters::Synchronizer<ApproPolicy>;
 
 using MatrixXd = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>;
@@ -39,30 +28,32 @@ using VectorXd = Eigen::Matrix<double, Eigen::Dynamic, 1>;
 
 #define PI 3.14159265358979323846
 
+double pos_xy_accu = 3; // [m]
+double pos_z_accu = 1; // [m]
+double acc_accu = 0.2; // [m/s2]
+double ang_vel_accu = 1 /180*PI; // [rad/s]
 
 class EKF : public rclcpp::Node
 {
   public:
-    EKF() : Node("ekf"), sync_(Sync(ApproPolicy(10), pos_sub_, vel_sub_, pose_sub_, body_acc_sub_, body_omega_sub_))
+    EKF() : Node("ekf"), sync_(Sync(ApproPolicy(10), pos_sub_, body_acc_sub_, body_ang_vel_sub_))
     {
       states_pub_ = this->create_publisher<interfaces::msg::States>("estimated_states", 10);
 
-      pos_sub_.subscribe(this, "dummy_position");
-      vel_sub_.subscribe(this, "dummy_velocity");
-      pose_sub_.subscribe(this, "dummy_pose");
-      body_acc_sub_.subscribe(this, "dummy_body_acc");
-      body_omega_sub_.subscribe(this, "dummy_body_omega");
+      pos_sub_.subscribe(this, "position");
+      body_acc_sub_.subscribe(this, "body_acc");
+      body_ang_vel_sub_.subscribe(this, "body_ang_vel");
 
       // for exact sync
-      // sync_ = std::make_shared<message_filters::TimeSynchronizer<Position, Velocity, Pose, Acc, Omega>>
-      //                                                 (pos_sub_, vel_sub_, pose_sub_, body_acc_sub_, body_omega_sub_, 10);
-      // sync_->registerCallback(std::bind(&EKF::sync_ekf_callback, this, _1, _2, _3, _4, _5));
+      // sync_ = std::make_shared<message_filters::TimeSynchronizer<Vector3Stamped, Vector3Stamped, Vector3Stamped>>
+      //                                                 (pos_sub_, body_acc_sub_, body_ang_vel_sub_, 10);
+      // sync_->registerCallback(std::bind(&EKF::sync_ekf_callback, this, _1, _2, _3));
 
       // for approximate sync
-      sync_.registerCallback(std::bind(&EKF::sync_ekf_callback, this, _1, _2, _3, _4, _5));
+      sync_.registerCallback(std::bind(&EKF::sync_ekf_callback, this, _1, _2, _3));
 
       // Read from param
-      Ts_ = 0.1; // [s]
+      Ts_ = 0.05; // [s]
       
       // initialize EKF parameters
       states_mu_ = VectorXd::Zero(9);
@@ -73,33 +64,28 @@ class EKF : public rclcpp::Node
       states_sigma_.block(6,6,3,3) = 0.4*MatrixXd::Identity(3,3);
 
       Q_ = MatrixXd::Zero(6,6);
-      Q_.block(0,0,3,3) = pow(0.1,2)*MatrixXd::Identity(3,3);
-      Q_.block(3,3,3,3) = pow(0.1/180*PI,2)*MatrixXd::Identity(3,3);
+      Q_.block(0,0,3,3) = pow(acc_accu,2)*MatrixXd::Identity(3,3);
+      Q_.block(3,3,3,3) = pow(ang_vel_accu,2)*MatrixXd::Identity(3,3);
 
-      R_ = MatrixXd::Zero(9,9);
-      R_.block(0,0,3,3) = pow(2,2)*MatrixXd::Identity(3,3);
-      R_.block(3,3,3,3) = pow(0.1,2)*MatrixXd::Identity(3,3);
-      R_(6,6) = pow(0.1/180*PI,2);
-      R_(7,7) = pow(0.1/180*PI,2);
-      R_(8,8) = pow(0.5/180*PI,2);
+      R_ = MatrixXd::Zero(3,3);
+      R_(0,0) = pow(pos_xy_accu,2);
+      R_(1,1) = pow(pos_xy_accu,2);
+      R_(2,2) = pow(pos_z_accu,2);
     }
 
   private:
-    void sync_ekf_callback(const Position::ConstSharedPtr& msg_pos,
-                           const Velocity::ConstSharedPtr& msg_vel,
-                           const Pose::ConstSharedPtr& msg_pose,
-                           const Acc::ConstSharedPtr& msg_body_acc,
-                           const Omega::ConstSharedPtr& msg_body_omega)
+    void sync_ekf_callback(const Vector3Stamped::ConstSharedPtr& msg_pos,
+                           const Vector3Stamped::ConstSharedPtr& msg_body_acc,
+                           const Vector3Stamped::ConstSharedPtr& msg_body_ang_vel)
     {
       ///////// Extended Kalman Filter Implementation Starts
       VectorXd U(6);
-      U << msg_body_acc->ax, msg_body_acc->ay, msg_body_acc->az,
-           msg_body_omega->wx, msg_body_omega->wy, msg_body_omega->wz;
-      VectorXd z_bar(9);
-      z_bar << msg_pos->x, msg_pos->y, msg_pos->z,
-               msg_vel->vx, msg_vel->vy, msg_vel->vz,
-               msg_pose->roll, msg_pose-> pitch, msg_pose->yaw;
-
+      U << msg_body_acc->vector.x, msg_body_acc->vector.y, msg_body_acc->vector.z,
+           msg_body_ang_vel->vector.x, msg_body_ang_vel->vector.y, msg_body_ang_vel->vector.z;
+           
+      VectorXd z_bar(3);
+      z_bar << msg_pos->vector.x, msg_pos->vector.y, msg_pos->vector.z;
+               
       // Prior update
 
       double phi = states_mu_(6); // roll
@@ -190,13 +176,14 @@ class EKF : public rclcpp::Node
       MatrixXd Pp = A*states_sigma_*A.transpose() + S*Q_*S.transpose();
 
       // Measurement update
-      VectorXd z = xp;
-      MatrixXd H = MatrixXd::Identity(9,9);
-      MatrixXd M = MatrixXd::Identity(9,9);
+      VectorXd z = xp.segment(0,3);
+      MatrixXd H = MatrixXd::Zero(3,9);
+      H.block(0,0,3,3).setIdentity();
+      MatrixXd M = MatrixXd::Identity(3,3);
+
       MatrixXd K_trans = (H*Pp*H.transpose() + M*R_*M.transpose()).transpose().ldlt().solve(H*Pp.transpose());
       MatrixXd K = K_trans.transpose();
       VectorXd Dz = z_bar - z;
-      Dz(8) = my_mod(Dz(8) + PI, 2*PI) - PI;
 
       states_mu_ = xp + K*Dz;
       states_sigma_ = (MatrixXd::Identity(9,9) - K*H)*Pp;
@@ -225,14 +212,12 @@ class EKF : public rclcpp::Node
         return x - floor(x/y)*y;
     }
 
-    message_filters::Subscriber<Position> pos_sub_;
-    message_filters::Subscriber<Velocity> vel_sub_;
-    message_filters::Subscriber<Pose> pose_sub_;
-    message_filters::Subscriber<Acc> body_acc_sub_;
-    message_filters::Subscriber<Omega> body_omega_sub_;
+    message_filters::Subscriber<Vector3Stamped> pos_sub_;
+    message_filters::Subscriber<Vector3Stamped> body_acc_sub_;
+    message_filters::Subscriber<Vector3Stamped> body_ang_vel_sub_;
 
     // for exact sync
-    // std::shared_ptr<message_filters::TimeSynchronizer<Position, Velocity, Pose, Acc, Omega>> sync_;
+    // std::shared_ptr<message_filters::TimeSynchronizer<Vector3Stamped, Vector3Stamped, Vector3Stamped>> sync_;
     
     // for approximate sync
     Sync sync_;
@@ -242,7 +227,7 @@ class EKF : public rclcpp::Node
     VectorXd states_mu_; // [x y z vx vy vz roll pitch yaw] 9*1
     MatrixXd states_sigma_; // 9*9
     MatrixXd Q_; // input noise 6*6
-    MatrixXd R_; // sensor noise 9*9
+    MatrixXd R_; // pos noise 3*3
 
     // publisher
     rclcpp::Publisher<interfaces::msg::States>::SharedPtr states_pub_;

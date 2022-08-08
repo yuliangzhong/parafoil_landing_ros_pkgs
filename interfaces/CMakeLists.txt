@@ -12,12 +12,6 @@ find_package(std_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/States.msg"
-  "msg/Position.msg"
-  "msg/Velocity.msg"
-  "msg/Pose.msg"
-  "msg/BodyAcceleration.msg"
-  "msg/BodyAngularVelocity.msg"
-  "msg/DoubleStamped.msg"
   DEPENDENCIES builtin_interfaces std_msgs
 )
 

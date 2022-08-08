@@ -8,12 +8,12 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(std_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 find_package(interfaces REQUIRED)
 find_package(message_filters REQUIRED)
 
 add_executable(ekf src/ekf.cpp)
-ament_target_dependencies(ekf rclcpp std_msgs interfaces message_filters)
+ament_target_dependencies(ekf rclcpp geometry_msgs interfaces message_filters)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
