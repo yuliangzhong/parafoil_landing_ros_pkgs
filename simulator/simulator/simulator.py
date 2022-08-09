@@ -115,9 +115,9 @@ cL = [c_L0, c_La, c_Lds] # lift force coefficients
 cD = [c_D0, c_Da2, c_Dds] # drag force coefficients
 cM = [c_lp, c_lda, c_m0, c_ma, c_mq, c_nr, c_nda] # moment coefficients
 
-# sensor accuracy
-pos_xy_accu = 3 # [m]
-pos_z_accu = 1 # [m]
+# sensor accuracy (1-sigma)
+pos_xy_accu = 1.5 # [m]
+pos_z_accu = 0.5 # [m]
 acc_accu = 0.2 # [m/s2]
 ang_vel_accu = 1 /180*pi # [rad/s]
 
@@ -140,7 +140,7 @@ class Simulator(Node):
 
         # state init
         # position, quaternion, velocity, angular velocity in the initial(ground) frame
-        self.pos = np.array([0, 0, -500], dtype=float64).reshape(-1,1)
+        self.pos = np.array([0, 0, -100], dtype=float64).reshape(-1,1)
         self.quat = matrix2quat(rpy2matrix3(np.array([0, 0.006, -45/180*pi], dtype=float64).reshape(-1,1)))
         self.vel = dot(quat2matrix(self.quat), np.array([3.819, -0.673, 1.62], dtype=float64).reshape(-1,1))
         self.ang_vel = np.zeros((3,1), dtype=float64)
@@ -248,37 +248,35 @@ class Simulator(Node):
 
 
         ##### sensor publish #####
-        pos_rand = np.random.multivariate_normal([0,0,0], np.diag([pos_xy_accu**2, pos_xy_accu**2, pos_z_accu**2]), 1).reshape(-1)
-        tmp_pos = self.pos.reshape(-1) + pos_rand
+        pos_rand = np.random.multivariate_normal([0,0,0], np.eye(3), 1).reshape(-1)
+        tmp_pos = self.pos.reshape(-1) + [pos_rand[0]*pos_xy_accu, pos_rand[1]*pos_xy_accu, pos_rand[2]*pos_z_accu]
         pos_msg = Vector3Stamped()
         pos_msg.vector.x, pos_msg.vector.y, pos_msg.vector.z = tmp_pos[0], tmp_pos[1], tmp_pos[2]
         pos_msg.header.stamp = current_time
         self.pos_pub.publish(pos_msg)
 
-        body_acc_rand = np.random.multivariate_normal([0,0,0], acc_accu**2 * np.eye(3), 1).reshape(-1)
-        tmp_body_acc = self.body_acc.reshape(-1) + body_acc_rand
+        body_acc_rand = np.random.multivariate_normal([0,0,0], np.eye(3), 1).reshape(-1)
+        tmp_body_acc = self.body_acc.reshape(-1) + acc_accu*body_acc_rand
         body_acc_msg = Vector3Stamped()
         body_acc_msg.vector.x, body_acc_msg.vector.y, body_acc_msg.vector.z = tmp_body_acc[0], tmp_body_acc[1], tmp_body_acc[2]
         body_acc_msg.header.stamp = current_time
         self.body_acc_pub.publish(body_acc_msg)
 
-        body_ang_vel_rand = np.random.multivariate_normal([0,0,0], ang_vel_accu**2 *np.eye(3), 1).reshape(-1)
-        tmp_body_ang_vel = dot(quat2matrix(self.quat).T, self.ang_vel).reshape(-1) + body_ang_vel_rand
+        body_ang_vel_rand = np.random.multivariate_normal([0,0,0], np.eye(3), 1).reshape(-1)
+        tmp_body_ang_vel = dot(quat2matrix(self.quat).T, self.ang_vel).reshape(-1) + ang_vel_accu*body_ang_vel_rand
         body_ang_vel_msg = Vector3Stamped()
         body_ang_vel_msg.vector.x, body_ang_vel_msg.vector.y, body_ang_vel_msg.vector.z = tmp_body_ang_vel[0], tmp_body_ang_vel[1], tmp_body_ang_vel[2]
         body_ang_vel_msg.header.stamp = current_time
         self.body_ang_vel_pub.publish(body_ang_vel_msg)
 
         ##### viz #####
-        pos_viz = self.pos.reshape(-1)
-        vel_viz = self.vel.reshape(-1)
-        rpy_viz = matrix2rpy(quat2matrix(self.quat)).reshape(-1)
-        pqr_viz = dot(quat2matrix(self.quat).T, self.ang_vel).reshape(-1)
-        wind_viz = self.current_wind.reshape(-1)
-        print("------")
-        self.get_logger().info("pos: (%.3f, %.3f, %.3f), vel: (%.3f, %.3f, %.3f)" %(pos_viz[0], pos_viz[1], pos_viz[2], vel_viz[0], vel_viz[1], vel_viz[2]))
-        self.get_logger().info("rpy: (%.3f, %.3f, %.3f), pqr: (%.3f, %.3f, %.3f)" %(rpy_viz[0], rpy_viz[1], rpy_viz[2], pqr_viz[0], pqr_viz[1], pqr_viz[2]))
-        self.get_logger().info("wind: (%.3f, %.3f, %.3f), count: %d" %(wind_viz[0], wind_viz[1], wind_viz[2], self.cnt))
+        print("-----")
+        print("pos: ", self.pos.reshape(-1))
+        print("vel: ", self.vel.reshape(-1))
+        print("rpy: ", matrix2rpy(quat2matrix(self.quat)).reshape(-1))
+        print("pqr: ", dot(quat2matrix(self.quat).T, self.ang_vel).reshape(-1))
+        print("current wind: ", self.current_wind.reshape(-1))
+        print("count: ", self.cnt)
         end_time = time.time()
         print("%.3f [ms]" % ((end_time - start_time)*1000))
 

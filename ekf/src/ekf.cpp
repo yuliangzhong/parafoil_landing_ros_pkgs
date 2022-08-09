@@ -28,8 +28,8 @@ using VectorXd = Eigen::Matrix<double, Eigen::Dynamic, 1>;
 
 #define PI 3.14159265358979323846
 
-double pos_xy_accu = 3; // [m]
-double pos_z_accu = 1; // [m]
+double pos_xy_accu = 1.5; // [m]
+double pos_z_accu = 0.5; // [m]
 double acc_accu = 0.2; // [m/s2]
 double ang_vel_accu = 1 /180*PI; // [rad/s]
 
@@ -78,6 +78,15 @@ class EKF : public rclcpp::Node
                            const Vector3Stamped::ConstSharedPtr& msg_body_acc,
                            const Vector3Stamped::ConstSharedPtr& msg_body_ang_vel)
     {
+      // if (if_init_ == 0)
+      // {
+      //   states_mu_(0) = msg_pos->vector.x;
+      //   states_mu_(1) = msg_pos->vector.y;
+      //   states_mu_(2) = msg_pos->vector.z;
+      //   if_init_ = 1;
+      //   return;
+      // }
+
       ///////// Extended Kalman Filter Implementation Starts
       VectorXd U(6);
       U << msg_body_acc->vector.x, msg_body_acc->vector.y, msg_body_acc->vector.z,
@@ -190,15 +199,16 @@ class EKF : public rclcpp::Node
 
       // publish current estimation
       auto estimated_state = interfaces::msg::States();
+      estimated_state.header.stamp = this->get_clock()->now();
       estimated_state.x = states_mu_(0);
       estimated_state.y = states_mu_(1);
       estimated_state.z = states_mu_(2);
       estimated_state.vx = states_mu_(3);
       estimated_state.vy = states_mu_(4);
       estimated_state.vz = states_mu_(5);
-      estimated_state.roll = states_mu_(6);
-      estimated_state.pitch = states_mu_(7);
-      estimated_state.yaw = my_mod(states_mu_(8) + PI, 2*PI) - PI;
+      estimated_state.roll = warp2pi(states_mu_(6));
+      estimated_state.pitch = warp2pi(states_mu_(7));
+      estimated_state.yaw = warp2pi(states_mu_(8));
       states_pub_->publish(estimated_state);
 
       RCLCPP_INFO(this->get_logger(), "I am at: (%.3f, %.3f, %.3f), heading: %.3f",
@@ -207,9 +217,9 @@ class EKF : public rclcpp::Node
       ///////// Extended Kalman Filter Ends
     }
 
-    double my_mod(double x, double y)
+    double warp2pi(double x)
     {
-        return x - floor(x/y)*y;
+        return atan2(sin(x), cos(x));
     }
 
     message_filters::Subscriber<Vector3Stamped> pos_sub_;
@@ -224,6 +234,7 @@ class EKF : public rclcpp::Node
 
     // EKF parameters
     double Ts_;
+    bool if_init_ = 0;
     VectorXd states_mu_; // [x y z vx vy vz roll pitch yaw] 9*1
     MatrixXd states_sigma_; // 9*9
     MatrixXd Q_; // input noise 6*6
