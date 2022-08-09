@@ -53,7 +53,7 @@ class EKF : public rclcpp::Node
       sync_.registerCallback(std::bind(&EKF::sync_ekf_callback, this, _1, _2, _3));
 
       // Read from param
-      Ts_ = 0.05; // [s]
+      Ts_ = 0.1; // [s]
       
       // initialize EKF parameters
       states_mu_ = VectorXd::Zero(9);

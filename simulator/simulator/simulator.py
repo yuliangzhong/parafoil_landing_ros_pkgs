@@ -8,6 +8,8 @@ from numpy import dot, float64
 from random import randint
 from math import pi, sin, cos, sqrt, atan, atan2, asin
 
+import time
+
 ##### Definition #####
 # rpy: roll, pitch, yaw. Sequence: yaw-pitch-roll
 # q: quaternion, [[q0, q1, q2, q3]] = [q0, q_h]
@@ -66,7 +68,7 @@ def cross_product(a, b):
     return np.cross(a.reshape(-1), b.reshape(-1)).reshape(-1,1)
 
 # sim constant
-dT = 0.05 # seconds
+dT = 0.1 # seconds
 rho = 1.29 # kg/m3
 gravity_acc = + 9.81 # z-down
 
@@ -166,6 +168,7 @@ class Simulator(Node):
 
         ##### save current time #####
         current_time = self.get_clock().now().to_msg()
+        start_time = time.time()
 
         ##### check if landed #####
         if self.pos[2] > 0:
@@ -246,26 +249,23 @@ class Simulator(Node):
 
         ##### sensor publish #####
         pos_rand = np.random.multivariate_normal([0,0,0], np.diag([pos_xy_accu**2, pos_xy_accu**2, pos_z_accu**2]), 1).reshape(-1)
-        body_acc_rand = np.random.multivariate_normal([0,0,0], acc_accu**2 * np.eye(3), 1).reshape(-1)
-        body_ang_vel_rand = np.random.multivariate_normal([0,0,0], ang_vel_accu**2 *np.eye(3), 1).reshape(-1)
-
         tmp_pos = self.pos.reshape(-1) + pos_rand
-        tmp_body_acc = self.body_acc.reshape(-1) + body_acc_rand
-        tmp_body_ang_vel = dot(quat2matrix(self.quat).T, self.ang_vel).reshape(-1) + body_ang_vel_rand
-
         pos_msg = Vector3Stamped()
         pos_msg.vector.x, pos_msg.vector.y, pos_msg.vector.z = tmp_pos[0], tmp_pos[1], tmp_pos[2]
-        body_acc_msg = Vector3Stamped()
-        body_acc_msg.vector.x, body_acc_msg.vector.y, body_acc_msg.vector.z = tmp_body_acc[0], tmp_body_acc[1], tmp_body_acc[2]
-        body_ang_vel_msg = Vector3Stamped()
-        body_ang_vel_msg.vector.x, body_ang_vel_msg.vector.y, body_ang_vel_msg.vector.z = tmp_body_ang_vel[0], tmp_body_ang_vel[1], tmp_body_ang_vel[2]
-
         pos_msg.header.stamp = current_time
         self.pos_pub.publish(pos_msg)
 
+        body_acc_rand = np.random.multivariate_normal([0,0,0], acc_accu**2 * np.eye(3), 1).reshape(-1)
+        tmp_body_acc = self.body_acc.reshape(-1) + body_acc_rand
+        body_acc_msg = Vector3Stamped()
+        body_acc_msg.vector.x, body_acc_msg.vector.y, body_acc_msg.vector.z = tmp_body_acc[0], tmp_body_acc[1], tmp_body_acc[2]
         body_acc_msg.header.stamp = current_time
         self.body_acc_pub.publish(body_acc_msg)
 
+        body_ang_vel_rand = np.random.multivariate_normal([0,0,0], ang_vel_accu**2 *np.eye(3), 1).reshape(-1)
+        tmp_body_ang_vel = dot(quat2matrix(self.quat).T, self.ang_vel).reshape(-1) + body_ang_vel_rand
+        body_ang_vel_msg = Vector3Stamped()
+        body_ang_vel_msg.vector.x, body_ang_vel_msg.vector.y, body_ang_vel_msg.vector.z = tmp_body_ang_vel[0], tmp_body_ang_vel[1], tmp_body_ang_vel[2]
         body_ang_vel_msg.header.stamp = current_time
         self.body_ang_vel_pub.publish(body_ang_vel_msg)
 
@@ -279,7 +279,8 @@ class Simulator(Node):
         self.get_logger().info("pos: (%.3f, %.3f, %.3f), vel: (%.3f, %.3f, %.3f)" %(pos_viz[0], pos_viz[1], pos_viz[2], vel_viz[0], vel_viz[1], vel_viz[2]))
         self.get_logger().info("rpy: (%.3f, %.3f, %.3f), pqr: (%.3f, %.3f, %.3f)" %(rpy_viz[0], rpy_viz[1], rpy_viz[2], pqr_viz[0], pqr_viz[1], pqr_viz[2]))
         self.get_logger().info("wind: (%.3f, %.3f, %.3f), count: %d" %(wind_viz[0], wind_viz[1], wind_viz[2], self.cnt))
-
+        end_time = time.time()
+        print("%.3f [ms]" % ((end_time - start_time)*1000))
 
 def main(args=None):
     rclpy.init(args=args)
