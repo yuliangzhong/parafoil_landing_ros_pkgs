@@ -32,13 +32,19 @@ double pos_xy_accu = 1.5; // [m]
 double pos_z_accu = 0.5; // [m]
 double acc_accu = 0.2; // [m/s2]
 double ang_vel_accu = 1 /180*PI; // [rad/s]
+// double pos_xy_accu = 0.001; // [m]
+// double pos_z_accu = 0.001; // [m]
+// double acc_accu = 0.001; // [m/s2]
+// double ang_vel_accu = 0; // [rad/s]
 
 class EKF : public rclcpp::Node
 {
   public:
-    EKF() : Node("ekf"), sync_(Sync(ApproPolicy(10), pos_sub_, body_acc_sub_, body_ang_vel_sub_))
+    EKF() : Node("ekf"), sync_(Sync(ApproPolicy(5), pos_sub_, body_acc_sub_, body_ang_vel_sub_))
     {
-      states_pub_ = this->create_publisher<interfaces::msg::States>("estimated_states", 10);
+      states_pub_ = this->create_publisher<interfaces::msg::States>("estimated_states", 1);
+      est_pos_pub_ = this->create_publisher<Vector3Stamped>("estimated_pos", 1);
+      est_rpy_pub_ = this->create_publisher<Vector3Stamped>("estimated_rpy", 1);
 
       pos_sub_.subscribe(this, "position");
       body_acc_sub_.subscribe(this, "body_acc");
@@ -57,6 +63,15 @@ class EKF : public rclcpp::Node
       
       // initialize EKF parameters
       states_mu_ = VectorXd::Zero(9);
+      // states_mu_(2) = -50.0;
+      // states_mu_(3) = -3.1831;
+      // states_mu_(4) = -2.2314;
+      // states_mu_(5) = 1.5971;
+      // states_mu_(7) = -0.006;
+      // states_mu_(8) = -2.3562;
+      states_mu_(0) = 0.5;
+      states_mu_(2) = -1;
+      states_mu_(4) = 0.5*0.1;
 
       states_sigma_ = MatrixXd::Zero(9,9);
       states_sigma_.block(0,0,3,3) = 4*MatrixXd::Identity(3,3);
@@ -78,15 +93,6 @@ class EKF : public rclcpp::Node
                            const Vector3Stamped::ConstSharedPtr& msg_body_acc,
                            const Vector3Stamped::ConstSharedPtr& msg_body_ang_vel)
     {
-      // if (if_init_ == 0)
-      // {
-      //   states_mu_(0) = msg_pos->vector.x;
-      //   states_mu_(1) = msg_pos->vector.y;
-      //   states_mu_(2) = msg_pos->vector.z;
-      //   if_init_ = 1;
-      //   return;
-      // }
-
       ///////// Extended Kalman Filter Implementation Starts
       VectorXd U(6);
       U << msg_body_acc->vector.x, msg_body_acc->vector.y, msg_body_acc->vector.z,
@@ -214,6 +220,20 @@ class EKF : public rclcpp::Node
       RCLCPP_INFO(this->get_logger(), "I am at: (%.3f, %.3f, %.3f), heading: %.3f",
                                        states_mu_(0), states_mu_(1), states_mu_(2), estimated_state.yaw);
       
+      auto est_pos_msg = Vector3Stamped();
+      est_pos_msg.header.stamp = estimated_state.header.stamp;
+      est_pos_msg.vector.x = estimated_state.x;
+      est_pos_msg.vector.y = estimated_state.y;
+      est_pos_msg.vector.z = estimated_state.z;
+      est_pos_pub_->publish(est_pos_msg);
+
+      auto est_rpy_msg = Vector3Stamped();
+      est_rpy_msg.header.stamp = estimated_state.header.stamp;
+      est_rpy_msg.vector.x = estimated_state.roll;
+      est_rpy_msg.vector.y = estimated_state.pitch;
+      est_rpy_msg.vector.z = estimated_state.yaw;
+      est_rpy_pub_->publish(est_rpy_msg);
+
       ///////// Extended Kalman Filter Ends
     }
 
@@ -234,7 +254,6 @@ class EKF : public rclcpp::Node
 
     // EKF parameters
     double Ts_;
-    bool if_init_ = 0;
     VectorXd states_mu_; // [x y z vx vy vz roll pitch yaw] 9*1
     MatrixXd states_sigma_; // 9*9
     MatrixXd Q_; // input noise 6*6
@@ -242,6 +261,8 @@ class EKF : public rclcpp::Node
 
     // publisher
     rclcpp::Publisher<interfaces::msg::States>::SharedPtr states_pub_;
+    rclcpp::Publisher<Vector3Stamped>::SharedPtr est_pos_pub_;
+    rclcpp::Publisher<Vector3Stamped>::SharedPtr est_rpy_pub_;
 
 };
 

@@ -7,8 +7,12 @@ import numpy as np
 from numpy import dot, float64
 from random import randint
 from math import pi, sin, cos, sqrt, atan, atan2, asin
+import matplotlib.pyplot as plt
+from mpl_toolkits import mplot3d
 
 import time
+import sys
+import copy
 
 ##### Definition #####
 # rpy: roll, pitch, yaw. Sequence: yaw-pitch-roll
@@ -121,14 +125,19 @@ pos_z_accu = 0.5 # [m]
 acc_accu = 0.2 # [m/s2]
 ang_vel_accu = 1 /180*pi # [rad/s]
 
+fig = plt.figure()
+ax = plt.axes(projection='3d')
+
 class Simulator(Node):
 
     def __init__(self):
         super().__init__('simulator')
         # simulator state publishers
-        self.pos_pub = self.create_publisher(Vector3Stamped, 'position', 5)
-        self.body_acc_pub = self.create_publisher(Vector3Stamped, 'body_acc', 5)
-        self.body_ang_vel_pub = self.create_publisher(Vector3Stamped, 'body_ang_vel', 5)
+        self.pos_pub = self.create_publisher(Vector3Stamped, 'position', 1)
+        self.body_acc_pub = self.create_publisher(Vector3Stamped, 'body_acc', 1)
+        self.body_ang_vel_pub = self.create_publisher(Vector3Stamped, 'body_ang_vel', 1)
+        self.rpy_pub = self.create_publisher(Vector3Stamped, 'debug_rpy', 1)
+
         timer_period = dT  # seconds
         self.timer = self.create_timer(timer_period, self.sim_step_forward)
 
@@ -140,18 +149,22 @@ class Simulator(Node):
 
         # state init
         # position, quaternion, velocity, angular velocity in the initial(ground) frame
-        self.pos = np.array([0, 0, -100], dtype=float64).reshape(-1,1)
-        self.quat = matrix2quat(rpy2matrix3(np.array([0, 0.006, -45/180*pi], dtype=float64).reshape(-1,1)))
+        self.pos = np.array([0, 0, -50], dtype=float64).reshape(-1,1)
+        self.quat = matrix2quat(rpy2matrix3(np.array([0, 0.006, -135/180*pi], dtype=float64).reshape(-1,1)))
         self.vel = dot(quat2matrix(self.quat), np.array([3.819, -0.673, 1.62], dtype=float64).reshape(-1,1))
         self.ang_vel = np.zeros((3,1), dtype=float64)
         self.body_acc = np.zeros((3,1), dtype=float64)
 
         # canopy deflection (control)
-        self.delta_l = 0.5 # normalized in [0,1]
-        self.delta_r = 0.5 # normalized in [0,1]
+        self.delta_l = 1 # normalized in [0,1]
+        self.delta_r = 0 # normalized in [0,1]
 
         # canopy deflection control subscribers
         self.control_sub = self.create_subscription(Vector3Stamped, '/delta_left_right_01', self.control_callback, 1)
+
+        self.pos_x_buffer = []
+        self.pos_y_buffer = []
+        self.pos_h_buffer = []
 
     def control_callback(self, msg):
         self.delta_l = max(0, min(1, msg.vector.x))
@@ -174,7 +187,13 @@ class Simulator(Node):
         if self.pos[2] > 0:
             self.if_stop = 1
             print("system landed at %.2f[m], %.2f[m]" % (self.pos[0], self.pos[1]))
-            return
+            ax.scatter3D(self.pos_y_buffer, self.pos_x_buffer, self.pos_h_buffer, color='red', s=10, alpha=0.5)
+            ax.set_xlabel('y+ East')
+            ax.set_ylabel('x+ North')
+            ax.set_zlabel('h+ Height')
+            
+            plt.show()
+            sys.exit()
 
         # butter worth 2/4/6 order play with cutpff 2~10 Hz omega_c
         
@@ -249,27 +268,40 @@ class Simulator(Node):
 
         ##### sensor publish #####
         pos_rand = np.random.multivariate_normal([0,0,0], np.eye(3), 1).reshape(-1)
-        tmp_pos = self.pos.reshape(-1) + [pos_rand[0]*pos_xy_accu, pos_rand[1]*pos_xy_accu, pos_rand[2]*pos_z_accu]
+        # tmp_pos = self.pos.reshape(-1) + [pos_rand[0]*pos_xy_accu, pos_rand[1]*pos_xy_accu, pos_rand[2]*pos_z_accu]
+        tmp_pos = self.pos.reshape(-1)
         pos_msg = Vector3Stamped()
         pos_msg.vector.x, pos_msg.vector.y, pos_msg.vector.z = tmp_pos[0], tmp_pos[1], tmp_pos[2]
         pos_msg.header.stamp = current_time
         self.pos_pub.publish(pos_msg)
 
         body_acc_rand = np.random.multivariate_normal([0,0,0], np.eye(3), 1).reshape(-1)
-        tmp_body_acc = self.body_acc.reshape(-1) + acc_accu*body_acc_rand
+        # tmp_body_acc = self.body_acc.reshape(-1) + acc_accu*body_acc_rand
+        tmp_body_acc = self.body_acc.reshape(-1)
         body_acc_msg = Vector3Stamped()
         body_acc_msg.vector.x, body_acc_msg.vector.y, body_acc_msg.vector.z = tmp_body_acc[0], tmp_body_acc[1], tmp_body_acc[2]
         body_acc_msg.header.stamp = current_time
         self.body_acc_pub.publish(body_acc_msg)
 
         body_ang_vel_rand = np.random.multivariate_normal([0,0,0], np.eye(3), 1).reshape(-1)
-        tmp_body_ang_vel = dot(quat2matrix(self.quat).T, self.ang_vel).reshape(-1) + ang_vel_accu*body_ang_vel_rand
+        # tmp_body_ang_vel = dot(quat2matrix(self.quat).T, self.ang_vel).reshape(-1) + ang_vel_accu*body_ang_vel_rand
+        tmp_body_ang_vel = dot(quat2matrix(self.quat).T, self.ang_vel).reshape(-1)
         body_ang_vel_msg = Vector3Stamped()
         body_ang_vel_msg.vector.x, body_ang_vel_msg.vector.y, body_ang_vel_msg.vector.z = tmp_body_ang_vel[0], tmp_body_ang_vel[1], tmp_body_ang_vel[2]
         body_ang_vel_msg.header.stamp = current_time
         self.body_ang_vel_pub.publish(body_ang_vel_msg)
 
-        ##### viz #####
+        tmp_rpy = matrix2rpy(quat2matrix(self.quat)).reshape(-1)
+        debug_rpy_msg = Vector3Stamped()
+        debug_rpy_msg.vector.x, debug_rpy_msg.vector.y, debug_rpy_msg.vector.z = tmp_rpy[0], tmp_rpy[1], tmp_rpy[2]
+        debug_rpy_msg.header.stamp = current_time
+        self.rpy_pub.publish(debug_rpy_msg)
+
+        ##### debug #####
+        self.pos_x_buffer.append(copy.copy(self.pos[0]))
+        self.pos_y_buffer.append(copy.copy(self.pos[1]))
+        self.pos_h_buffer.append(copy.copy(-self.pos[2]))
+
         print("-----")
         print("pos: ", self.pos.reshape(-1))
         print("vel: ", self.vel.reshape(-1))
