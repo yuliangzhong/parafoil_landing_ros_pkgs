@@ -38,6 +38,7 @@ int8_t spi_read(uint8_t reg_addr, uint8_t *data, uint32_t len, uint8_t* fd)
 	// spi[0].bits_per_word = bits;
 
 	data[0] = reg_addr;
+  printf("reg addr: [%d]\n", reg_addr);
 
 	for (int i=0; i<len; ++i)
 	{
@@ -45,16 +46,22 @@ int8_t spi_read(uint8_t reg_addr, uint8_t *data, uint32_t len, uint8_t* fd)
 		spi[i].tx_buf = (unsigned long long)(data+i);
 		spi[i].rx_buf = (unsigned long long)(data+i);
 		spi[i].len = 1;
+		// uint8_t cs_change = (*fd) == 3 ? 1 : 0;
+		// printf("Chip select change: %d\n", cs_change);
+		// spi[i].cs_change = SPI_CS_HIGH;
+		// printf("Chip select change: %d\n", spi[i].cs_change);
 		spi[i].speed_hz = speed;
 		spi[i].bits_per_word = bits;
 	}
 	int8_t rslt = ioctl(*fd, SPI_IOC_MESSAGE(len), spi);
-	printf("result after transfer %d;    ", rslt);
-
+	printf("result after transfer [%d]. FD: [%d];\n", rslt, *fd);
+  printf("rslt interpretted: %s \n", strerror(rslt));
+	printf("data: ");
 	for (int i=0; i<len; ++i)
 	{
 		printf("%d  ",data[i]);
 	}
+	printf("\n");
 
 	if(rslt < 0)
 	{
@@ -88,12 +95,31 @@ int main()
 		return -1;
 	}
 	
-	if(ioctl(acc_dev_addr, SPI_IOC_WR_MODE, &mode)<0)
-	{
-		perror("bad mode\n");
-		close(acc_dev_addr);
-		return -1;
-	}
+  int fds[2] = {acc_dev_addr, gyro_dev_addr};
+  for (int i = 0; i < 2; i++) {
+    int fd = fds[i];
+    if(ioctl(fd, SPI_IOC_WR_MODE, &mode)<0)
+    {
+      perror("bad mode\n");
+      close(fd);
+      return -1;
+    }
+
+    if(ioctl(fd, SPI_IOC_WR_MAX_SPEED_HZ, &speed)<0)
+    {
+      perror("err set speed\n");
+      close(fd);
+      return -1;
+    }
+
+    if(ioctl(fd, SPI_IOC_WR_BITS_PER_WORD, &bits)<0)
+    {
+      perror("err set bits per word\n");
+      close(fd);
+      return -1;
+    }
+  }
+
 	printf("acc addr: %d, gyro addr: %d\n", acc_dev_addr, gyro_dev_addr);
 
 
@@ -108,7 +134,7 @@ int main()
 
 	close(acc_dev_addr);
 	close(gyro_dev_addr);
-	printf("All good!!\n");
+	printf("end!!\n");
 
 	// InertialMeasurement meas;
     // for (int i=0;i<10;++i)

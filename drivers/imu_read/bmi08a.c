@@ -773,6 +773,7 @@ int8_t bmi08a_init(struct bmi08x_dev *dev)
 
         if (rslt == BMI08X_OK)
         {
+            printf("get regs second time\n");
             rslt = get_regs(BMI08X_REG_ACCEL_CHIP_ID, &chip_id, 1, dev);
 
             if (rslt == BMI08X_OK)
@@ -2057,7 +2058,7 @@ static int8_t get_regs(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, struct
         {
             /* Updating the data buffer */
             reg_data[index] = temp_buff[index + dev->dummy_byte];
-            printf("%d, ",reg_data[index]);
+            // printf("%d, ",reg_data[index]);
         }
     }
     else

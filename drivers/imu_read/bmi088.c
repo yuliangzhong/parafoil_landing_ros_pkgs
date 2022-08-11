@@ -47,6 +47,8 @@ bool bmi088_init(struct BMI088 *bmi) {
         return false;
     }
 
+    printf("acc pass*!!!!!!!!!\n");
+
     if ((rslt = bmi08g_init(&bmi->_dev)) != BMI08X_OK) {
         printf("Failed to initialize gyroscope!\n");
     }
