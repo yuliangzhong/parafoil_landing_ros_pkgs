@@ -136,7 +136,7 @@ class Simulator(Node):
         self.pos_pub = self.create_publisher(Vector3Stamped, 'position', 1)
         self.body_acc_pub = self.create_publisher(Vector3Stamped, 'body_acc', 1)
         self.body_ang_vel_pub = self.create_publisher(Vector3Stamped, 'body_ang_vel', 1)
-        self.rpy_pub = self.create_publisher(Vector3Stamped, 'debug_rpy', 1)
+        self.debug_vel_pub = self.create_publisher(Vector3Stamped, 'debug_vel', 1)
 
         timer_period = dT  # seconds
         self.timer = self.create_timer(timer_period, self.sim_step_forward)
@@ -149,15 +149,15 @@ class Simulator(Node):
 
         # state init
         # position, quaternion, velocity, angular velocity in the initial(ground) frame
-        self.pos = np.array([0, 0, -50], dtype=float64).reshape(-1,1)
-        self.quat = matrix2quat(rpy2matrix3(np.array([0, 0.006, -135/180*pi], dtype=float64).reshape(-1,1)))
+        self.pos = np.array([-10, -10, -50], dtype=float64).reshape(-1,1)
+        self.quat = matrix2quat(rpy2matrix3(np.array([0, 0.006, -60/180*pi], dtype=float64).reshape(-1,1)))
         self.vel = dot(quat2matrix(self.quat), np.array([3.819, -0.673, 1.62], dtype=float64).reshape(-1,1))
         self.ang_vel = np.zeros((3,1), dtype=float64)
         self.body_acc = np.zeros((3,1), dtype=float64)
 
         # canopy deflection (control)
-        self.delta_l = 1 # normalized in [0,1]
-        self.delta_r = 0 # normalized in [0,1]
+        self.delta_l = 0.5 # normalized in [0,1]
+        self.delta_r = 0.5 # normalized in [0,1]
 
         # canopy deflection control subscribers
         self.control_sub = self.create_subscription(Vector3Stamped, '/delta_left_right_01', self.control_callback, 1)
@@ -291,11 +291,13 @@ class Simulator(Node):
         body_ang_vel_msg.header.stamp = current_time
         self.body_ang_vel_pub.publish(body_ang_vel_msg)
 
-        tmp_rpy = matrix2rpy(quat2matrix(self.quat)).reshape(-1)
-        debug_rpy_msg = Vector3Stamped()
-        debug_rpy_msg.vector.x, debug_rpy_msg.vector.y, debug_rpy_msg.vector.z = tmp_rpy[0], tmp_rpy[1], tmp_rpy[2]
-        debug_rpy_msg.header.stamp = current_time
-        self.rpy_pub.publish(debug_rpy_msg)
+        psi = atan2(self.vel[1][0], self.vel[0][0])
+        Vh = (self.vel[1][0]**2 + self.vel[0][0]**2)**0.5
+        Vz = self.vel[2][0]
+        debug_vel_msg = Vector3Stamped()
+        debug_vel_msg.vector.x, debug_vel_msg.vector.y, debug_vel_msg.vector.z = psi, Vh, Vz
+        debug_vel_msg.header.stamp = current_time
+        self.debug_vel_pub.publish(debug_vel_msg)
 
         ##### debug #####
         self.pos_x_buffer.append(copy.copy(self.pos[0]))
