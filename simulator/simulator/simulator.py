@@ -156,8 +156,8 @@ class Simulator(Node):
         self.body_acc = np.zeros((3,1), dtype=float64)
 
         # canopy deflection (control)
-        self.delta_l = 0.5 # normalized in [0,1]
-        self.delta_r = 0.5 # normalized in [0,1]
+        self.delta_l = 1 # normalized in [0,1]
+        self.delta_r = 0 # normalized in [0,1]
 
         # canopy deflection control subscribers
         self.control_sub = self.create_subscription(Vector3Stamped, '/delta_left_right_01', self.control_callback, 1)
@@ -268,24 +268,24 @@ class Simulator(Node):
 
         ##### sensor publish #####
         pos_rand = np.random.multivariate_normal([0,0,0], np.eye(3), 1).reshape(-1)
-        # tmp_pos = self.pos.reshape(-1) + [pos_rand[0]*pos_xy_accu, pos_rand[1]*pos_xy_accu, pos_rand[2]*pos_z_accu]
-        tmp_pos = self.pos.reshape(-1)
+        tmp_pos = self.pos.reshape(-1) + [pos_rand[0]*pos_xy_accu, pos_rand[1]*pos_xy_accu, pos_rand[2]*pos_z_accu]
+        # tmp_pos = self.pos.reshape(-1)
         pos_msg = Vector3Stamped()
         pos_msg.vector.x, pos_msg.vector.y, pos_msg.vector.z = tmp_pos[0], tmp_pos[1], tmp_pos[2]
         pos_msg.header.stamp = current_time
         self.pos_pub.publish(pos_msg)
 
         body_acc_rand = np.random.multivariate_normal([0,0,0], np.eye(3), 1).reshape(-1)
-        # tmp_body_acc = self.body_acc.reshape(-1) + acc_accu*body_acc_rand
-        tmp_body_acc = self.body_acc.reshape(-1)
+        tmp_body_acc = self.body_acc.reshape(-1) + acc_accu*body_acc_rand
+        # tmp_body_acc = self.body_acc.reshape(-1)
         body_acc_msg = Vector3Stamped()
         body_acc_msg.vector.x, body_acc_msg.vector.y, body_acc_msg.vector.z = tmp_body_acc[0], tmp_body_acc[1], tmp_body_acc[2]
         body_acc_msg.header.stamp = current_time
         self.body_acc_pub.publish(body_acc_msg)
 
         body_ang_vel_rand = np.random.multivariate_normal([0,0,0], np.eye(3), 1).reshape(-1)
-        # tmp_body_ang_vel = dot(quat2matrix(self.quat).T, self.ang_vel).reshape(-1) + ang_vel_accu*body_ang_vel_rand
-        tmp_body_ang_vel = dot(quat2matrix(self.quat).T, self.ang_vel).reshape(-1)
+        tmp_body_ang_vel = dot(quat2matrix(self.quat).T, self.ang_vel).reshape(-1) + ang_vel_accu*body_ang_vel_rand
+        # tmp_body_ang_vel = dot(quat2matrix(self.quat).T, self.ang_vel).reshape(-1)
         body_ang_vel_msg = Vector3Stamped()
         body_ang_vel_msg.vector.x, body_ang_vel_msg.vector.y, body_ang_vel_msg.vector.z = tmp_body_ang_vel[0], tmp_body_ang_vel[1], tmp_body_ang_vel[2]
         body_ang_vel_msg.header.stamp = current_time
