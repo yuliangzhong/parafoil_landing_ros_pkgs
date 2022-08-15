@@ -1,73 +1,42 @@
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <string>
 
 #include <rclcpp/rclcpp.hpp>
-
-#include "interfaces/msg/states.hpp"
 #include "geometry_msgs/msg/vector3_stamped.hpp"
 
-#include "message_filters/subscriber.h"
-#include "message_filters/time_synchronizer.h"
-#include "message_filters/sync_policies/approximate_time.h"
-#include "message_filters/synchronizer.h"
-
+using namespace std::chrono_literals;
 using std::placeholders::_1;
-using std::placeholders::_2;
 using std::min;
 using std::max;
 
 using Vector3Stamped = geometry_msgs::msg::Vector3Stamped;
-using States = interfaces::msg::States;
-
-// using ApproPolicy = message_filters::sync_policies::ApproximateTime<States, Vector3Stamped>;
-using ApproPolicy = message_filters::sync_policies::ApproximateTime<Vector3Stamped, Vector3Stamped>;
-using Sync = message_filters::Synchronizer<ApproPolicy>;
 
 #define PI 3.14159265358979323846
 
 class SimplePdCtrler : public rclcpp::Node
 {
   public:
-    // SimplePdCtrler() : Node("simple_pd_ctrler"), sync_(Sync(ApproPolicy(10), states_sub, body_ang_vel_sub))
-    SimplePdCtrler() : Node("simple_pd_ctrler"), sync_(Sync(ApproPolicy(10), debug_rpy_sub, body_ang_vel_sub))
+    SimplePdCtrler() : Node("simple_pd_ctrler")
     {
       cmd_pub = this->create_publisher<Vector3Stamped>("delta_left_right_01", 1);
+      timer_ = this->create_wall_timer(100ms, std::bind(&SimplePdCtrler::cmd_callback, this));
 
-      // states_sub.subscribe(this, "estimated_states");
-      debug_rpy_sub.subscribe(this, "debug_rpy");
-      body_ang_vel_sub.subscribe(this, "body_ang_vel");
-
-      // for approximate sync
-      sync_.registerCallback(std::bind(&SimplePdCtrler::control_callback, this, _1, _2));
+      vel_sub = this->create_subscription<Vector3Stamped>("estimated_vel", 1, std::bind(&SimplePdCtrler::vel_callback, this, _1));
+      body_ang_vel_sub = this->create_subscription<Vector3Stamped>(
+                                             "body_ang_vel", 1, std::bind(&SimplePdCtrler::body_ang_vel_callback, this, _1));
     }
 
   private:
-    // void control_callback(const States::ConstSharedPtr& msg_states,
-    //                       const Vector3Stamped::ConstSharedPtr& msg_body_acc)
-    // {
-    //   double delta_yaw = msg_states->yaw - yaw_d;
-    //   double yaw_dot_now = msg_body_acc->vector.z; // approx
-
-    //   double err = warp2pi(delta_yaw);
-    //   double u = Kp*err + Kd*yaw_dot_now;
-
-    //   auto cmd = Vector3Stamped();
-    //   cmd.header.stamp = this->get_clock()->now();
-    //   cmd.vector.x = 0.5 + u;
-    //   cmd.vector.y = 0.5 - u;
-    //   cmd.vector.z = 0.0;
-    //   cmd_pub->publish(cmd);
-     
-    //   RCLCPP_INFO(this->get_logger(), "delta_l, delta_r = [%.2f, %.2f]", cmd.vector.x, cmd.vector.y);
-    // }
-    void control_callback(const Vector3Stamped::ConstSharedPtr& msg_rpy,
-                          const Vector3Stamped::ConstSharedPtr& msg_body_acc)
+    void cmd_callback()
     {
-      double delta_yaw = msg_rpy->vector.z - yaw_d;
-      double yaw_dot_now = msg_body_acc->vector.z; // approx
+      if (vel_update_flag == false or ang_update_flag == false) {return; }
+      
+      double delta_yaw = vel_now.vector.x - yaw_d;
+      double yaw_dot_now = body_ang_vel_now.vector.z; // approx
 
-      double err = warp2pi(delta_yaw);
+      double err = atan2(sin(delta_yaw), cos(delta_yaw));
       double u = Kp*err + Kd*yaw_dot_now;
 
       auto cmd = Vector3Stamped();
@@ -78,28 +47,43 @@ class SimplePdCtrler : public rclcpp::Node
       cmd_pub->publish(cmd);
      
       RCLCPP_INFO(this->get_logger(), "delta_l, delta_r = [%.2f, %.2f]", cmd.vector.x, cmd.vector.y);
+      
+      vel_update_flag = false;
+      ang_update_flag = false;
     }
 
-    double warp2pi(double x)
+    void vel_callback(const Vector3Stamped & msg)
     {
-        return atan2(sin(x), cos(x));
+      vel_now = msg;
+      vel_update_flag = true;
+    }
+
+    void body_ang_vel_callback(const Vector3Stamped & msg)
+    {
+      body_ang_vel_now = msg;
+      ang_update_flag = true;
     }
 
     // desired heading
-    double yaw_d = 0.0;
-    double Kp = 1;  // >=0
-    double Kd = 0.03; // >=0
+    double yaw_d = 0.25*PI;
+    double Kp = 3;  // >=0
+    double Kd = 0.1; // >=0
 
-    // subscribers
-    // message_filters::Subscriber<States> states_sub;
-    message_filters::Subscriber<Vector3Stamped> body_ang_vel_sub;
-    message_filters::Subscriber<Vector3Stamped> debug_rpy_sub;
-
-    // for approximate sync
-    Sync sync_;
+    // state storage
+    Vector3Stamped vel_now;
+    Vector3Stamped body_ang_vel_now;
 
     // publisher
+    rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Publisher<Vector3Stamped>::SharedPtr cmd_pub;
+    
+    // subscribers
+    rclcpp::Subscription<Vector3Stamped>::SharedPtr vel_sub;
+    rclcpp::Subscription<Vector3Stamped>::SharedPtr body_ang_vel_sub;
+
+    // update flags
+    bool vel_update_flag = false;
+    bool ang_update_flag = false;
 };
 
 int main(int argc, char * argv[])

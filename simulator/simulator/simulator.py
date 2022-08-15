@@ -125,8 +125,11 @@ pos_z_accu = 0.5 # [m]
 acc_accu = 0.2 # [m/s2]
 ang_vel_accu = 1 /180*pi # [rad/s]
 
-fig = plt.figure()
-ax = plt.axes(projection='3d')
+fig = plt.figure(figsize=(12,6))
+ax = fig.add_subplot(1,2,1,projection='3d')
+axis2 = plt.subplot(1,2,2)
+axis2.set_xlabel("East --> y")
+axis2.set_ylabel("North --> x")
 
 class Simulator(Node):
 
@@ -156,8 +159,8 @@ class Simulator(Node):
         self.body_acc = np.zeros((3,1), dtype=float64)
 
         # canopy deflection (control)
-        self.delta_l = 1 # normalized in [0,1]
-        self.delta_r = 0 # normalized in [0,1]
+        self.delta_l = 0.5 # normalized in [0,1]
+        self.delta_r = 0.5 # normalized in [0,1]
 
         # canopy deflection control subscribers
         self.control_sub = self.create_subscription(Vector3Stamped, '/delta_left_right_01', self.control_callback, 1)
@@ -187,11 +190,19 @@ class Simulator(Node):
         if self.pos[2] > 0:
             self.if_stop = 1
             print("system landed at %.2f[m], %.2f[m]" % (self.pos[0], self.pos[1]))
-            ax.scatter3D(self.pos_y_buffer, self.pos_x_buffer, self.pos_h_buffer, color='red', s=10, alpha=0.5)
+            ax.scatter3D(self.pos_y_buffer, self.pos_x_buffer, self.pos_h_buffer, color='red', s=6, alpha=0.5)
             ax.set_xlabel('y+ East')
             ax.set_ylabel('x+ North')
             ax.set_zlabel('h+ Height')
+            ax.set_title('3D trajectory plot')
             
+            axis2.plot(self.pos_y_buffer, self.pos_x_buffer, color='red', alpha=0.5)
+            axis2.grid()
+            axis2.set_aspect('equal')
+            axis2.set_title('2D projection plot')
+            plt.tight_layout()
+            plt.subplots_adjust(wspace=0.2)
+
             plt.show()
             sys.exit()
 
