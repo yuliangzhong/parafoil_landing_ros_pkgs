@@ -44,6 +44,7 @@
 /**\name        Header files
  ****************************************************************************/
 #include "bmi08x.h"
+#include <cstdio>
 
 /****************************************************************************/
 
@@ -574,17 +575,17 @@ int8_t bmi08g_get_data(struct bmi08x_sensor_data *gyro, struct bmi08x_dev *dev)
             lsb = data[0];
             msb = data[1];
             msblsb = (msb << 8) | lsb;
-            gyro->x = (int16_t)msblsb; /* Data in X axis */
+            gyro->x = ((int16_t) msblsb); /* Data in X axis */
 
             lsb = data[2];
             msb = data[3];
             msblsb = (msb << 8) | lsb;
-            gyro->y = (int16_t)msblsb; /* Data in Y axis */
+            gyro->y = ((int16_t) msblsb); /* Data in Y axis */
 
             lsb = data[4];
             msb = data[5];
             msblsb = (msb << 8) | lsb;
-            gyro->z = (int16_t)msblsb; /* Data in Z axis */
+            gyro->z = ((int16_t) msblsb); /* Data in Z axis */
         }
     }
     else
@@ -942,6 +943,8 @@ static int8_t null_ptr_check(const struct bmi08x_dev *dev)
 static int8_t get_regs(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, struct bmi08x_dev *dev)
 {
     int8_t rslt = BMI08X_OK;
+    uint16_t index;
+    uint8_t temp_buff[BMI08X_MAX_LEN];
 
     if (dev->intf == BMI08X_SPI_INTF)
     {
@@ -950,7 +953,18 @@ static int8_t get_regs(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, struct
     }
 
     /* Read gyro register */
-    dev->intf_rslt = dev->read(reg_addr, reg_data, len, dev->intf_ptr_gyro);
+    // dev->intf_rslt = dev->read(reg_addr, reg_data, len, dev->intf_ptr_gyro);
+    dev->intf_rslt = dev->read(reg_addr, temp_buff, (len + dev->dummy_byte), dev->intf_ptr_gyro);
+
+    if (dev->intf_rslt == BMI08X_INTF_RET_SUCCESS)
+    {
+        for (index = 0; index < len; index++)
+        {
+            /* Updating the data buffer */
+            reg_data[index] = temp_buff[index + dev->dummy_byte];
+            // printf("%d, ",reg_data[index]);
+        }
+    }
 
     if (dev->intf_rslt != BMI08X_INTF_RET_SUCCESS)
     {

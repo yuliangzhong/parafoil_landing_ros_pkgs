@@ -30,38 +30,25 @@ int8_t spi_read(uint8_t reg_addr, uint8_t *data, uint32_t len, uint8_t* fd)
 {
 	struct spi_ioc_transfer spi[len];
 
-	// memset(&spi[0], 0, sizeof(struct spi_ioc_transfer));
-	// spi[0].tx_buf = reg_addr;
-	// spi[0].rx_buf = reg_addr;
-	// spi[0].len = 1;
-	// spi[0].speed_hz = speed;
-	// spi[0].bits_per_word = bits;
-
 	data[0] = reg_addr;
-  printf("reg addr: [%d]\n", reg_addr);
+  	// printf("reg addr: [%d]\n", reg_addr);
+	memset(&spi[0], 0, sizeof(struct spi_ioc_transfer));
+	spi[0].tx_buf = (unsigned long long)((&reg_addr));
+	spi[0].rx_buf = (unsigned long long)(data);
+	spi[0].len = 1;
+	spi[0].speed_hz = speed;
+	spi[0].bits_per_word = bits;
 
-	for (int i=0; i<len; ++i)
+	for (int i=1; i<len; ++i)
 	{
 		memset(&spi[i], 0, sizeof(struct spi_ioc_transfer));
-		spi[i].tx_buf = (unsigned long long)(data+i);
+		// spi[i].tx_buf = (unsigned long long)((&reg_addr)+i);
 		spi[i].rx_buf = (unsigned long long)(data+i);
 		spi[i].len = 1;
-		// uint8_t cs_change = (*fd) == 3 ? 1 : 0;
-		// printf("Chip select change: %d\n", cs_change);
-		// spi[i].cs_change = SPI_CS_HIGH;
-		// printf("Chip select change: %d\n", spi[i].cs_change);
 		spi[i].speed_hz = speed;
 		spi[i].bits_per_word = bits;
 	}
 	int8_t rslt = ioctl(*fd, SPI_IOC_MESSAGE(len), spi);
-	printf("result after transfer [%d]. FD: [%d];\n", rslt, *fd);
-  printf("rslt interpretted: %s \n", strerror(rslt));
-	printf("data: ");
-	for (int i=0; i<len; ++i)
-	{
-		printf("%d  ",data[i]);
-	}
-	printf("\n");
 
 	if(rslt < 0)
 	{
@@ -72,9 +59,53 @@ int8_t spi_read(uint8_t reg_addr, uint8_t *data, uint32_t len, uint8_t* fd)
 	return 0;
 }
 
-int8_t spi_write(uint8_t reg_addr, const uint8_t *data, uint32_t len, void *handle) 
+// dev->write(reg_addr, reg_data, len, dev->intf_ptr_accel);
+int8_t spi_write(uint8_t reg_addr, const uint8_t *data, uint32_t len, uint8_t* fd) 
 {
-    return 0;
+	printf("in spi write \n");
+	// len = len + 1;
+    struct spi_ioc_transfer spi[len+1];
+	// spi[0] is address
+
+	memset(&spi[0], 0, sizeof(struct spi_ioc_transfer));
+			spi[0].tx_buf = (unsigned long long)(&reg_addr);
+			// spi[0].rx_buf = (unsigned long long)(&reg_addr);
+			spi[0].len = 1;
+			spi[0].speed_hz = speed;
+			spi[0].bits_per_word = bits;
+	
+	// // spi[1] is data
+	// memset(&spi[1], 0, sizeof(struct spi_ioc_transfer));
+	// 		spi[1].tx_buf = (unsigned long long)(data);
+	// 		spi[1].rx_buf = (unsigned long long)(data);
+	// 		spi[1].len = 1;
+	// 		spi[1].speed_hz = speed;
+	// 		spi[1].bits_per_word = bits;
+
+	for (int i=1; i<len+1; ++i)
+	{
+		memset(&spi[i], 0, sizeof(struct spi_ioc_transfer));
+		spi[i].tx_buf = (unsigned long long)(data+i-1);
+		spi[i].rx_buf = (unsigned long long)(data+i-1);
+		spi[i].len = 1;
+		spi[i].speed_hz = speed;
+		spi[i].bits_per_word = bits;
+	}
+	int8_t rslt = ioctl(*fd, SPI_IOC_MESSAGE(len+1), spi);
+
+	// for (int i=0; i<len; ++i)
+	// {
+	// 	printf("%d  ",data[i]);
+	// }
+	// printf("\n");
+
+	if(rslt < 0)
+	{
+		perror("Error transfering data over SPI bus");
+		close(*fd);
+		return -1;
+	}
+	return 0;
 }
 
 
@@ -95,8 +126,8 @@ int main()
 		return -1;
 	}
 	
-  int fds[2] = {acc_dev_addr, gyro_dev_addr};
-  for (int i = 0; i < 2; i++) {
+  	int fds[2] = {acc_dev_addr, gyro_dev_addr};
+  	for (int i = 0; i < 2; i++) {
     int fd = fds[i];
     if(ioctl(fd, SPI_IOC_WR_MODE, &mode)<0)
     {
@@ -122,6 +153,10 @@ int main()
 
 	printf("acc addr: %d, gyro addr: %d\n", acc_dev_addr, gyro_dev_addr);
 
+	// uint8_t reg_addr = 0x7D;
+	// uint8_t data = 4;
+	// uint32_t len = 1;
+	// spi_write(reg_addr, &data, len, &acc_dev_addr);
 
     BMI088 device{
         .bus_read = (bmi_bus_read_function) &spi_read,
@@ -132,18 +167,18 @@ int main()
 
     bool rslt = bmi088_init(&device);
 
-	close(acc_dev_addr);
-	close(gyro_dev_addr);
+	// close(acc_dev_addr);
+	// close(gyro_dev_addr);
 	printf("end!!\n");
+    
+	InertialMeasurement meas;
+    for (int i=0;i<10;++i)
+    {
+        bmi088_sample(&device, &meas);
+        sleep(1);
+    }
 
-	// InertialMeasurement meas;
-    // for (int i=0;i<10;++i)
-    // {
-    //     bmi088_sample(&device, &meas);
-    //     sleep(1);
-    // }
-
-    // return 0;
+    return 0;
     // spi_config_t spi_config;
     // spi_config.mode = 0;
     // spi_config.speed = 10000;

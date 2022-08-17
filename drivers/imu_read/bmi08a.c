@@ -751,7 +751,6 @@ int8_t bmi08a_init(struct bmi08x_dev *dev)
 
     /* Check for null pointer in the device structure */
     rslt = null_ptr_check(dev);
-    printf("result after nullptr check: %d\n", rslt);
 
     /* Proceed if null check is fine */
     if (rslt == BMI08X_OK)
@@ -763,7 +762,6 @@ int8_t bmi08a_init(struct bmi08x_dev *dev)
 
             /* Dummy read of Chip-ID in SPI mode */
             rslt = get_regs(BMI08X_REG_ACCEL_CHIP_ID, &chip_id, 1, dev);
-            printf("result after dummy check: %d\n", rslt);
         }
         else
         {
@@ -773,7 +771,6 @@ int8_t bmi08a_init(struct bmi08x_dev *dev)
 
         if (rslt == BMI08X_OK)
         {
-            printf("get regs second time\n");
             rslt = get_regs(BMI08X_REG_ACCEL_CHIP_ID, &chip_id, 1, dev);
 
             if (rslt == BMI08X_OK)
@@ -1171,13 +1168,17 @@ int8_t bmi08a_get_power_mode(struct bmi08x_dev *dev)
     /* Proceed if null check is fine */
     if (rslt == BMI08X_OK)
     {
-        rslt = bmi08a_get_regs(BMI08X_REG_ACCEL_PWR_CONF, &data, 1, dev);
+        rslt = bmi08a_get_regs(BMI08X_REG_ACCEL_PWR_CONF, &data, 2, dev);
+        printf("data in get power mode %d\n", data);
 
         if (rslt == BMI08X_OK)
         {
             /* Updating the current power mode */
             dev->accel_cfg.power = data;
         }
+
+        rslt = bmi08a_get_regs(BMI08X_REG_ACCEL_PWR_CTRL, &data, 2, dev);
+        printf("data in 7D is %d\n", data);
     }
 
     return rslt;
@@ -1250,7 +1251,7 @@ int8_t bmi08a_set_power_mode(struct bmi08x_dev *dev)
 int8_t bmi08a_get_data(struct bmi08x_sensor_data *accel, struct bmi08x_dev *dev)
 {
     int8_t rslt;
-    uint8_t data[6];
+    uint8_t data[7];
     uint8_t lsb, msb;
     uint16_t msblsb;
 
@@ -1261,22 +1262,22 @@ int8_t bmi08a_get_data(struct bmi08x_sensor_data *accel, struct bmi08x_dev *dev)
     if ((rslt == BMI08X_OK) && (accel != NULL))
     {
         /* Read accel sensor data */
-        rslt = bmi08a_get_regs(BMI08X_REG_ACCEL_X_LSB, data, 6, dev);
-
+        rslt = bmi08a_get_regs(BMI08X_REG_ACCEL_X_LSB, data, 7, dev);
+        printf("read acc data result %d\n", rslt);
         if (rslt == BMI08X_OK)
         {
-            lsb = data[0];
-            msb = data[1];
+            lsb = data[1];
+            msb = data[2];
             msblsb = (msb << 8) | lsb;
             accel->x = ((int16_t) msblsb); /* Data in X axis */
 
-            lsb = data[2];
-            msb = data[3];
+            lsb = data[3];
+            msb = data[4];
             msblsb = (msb << 8) | lsb;
             accel->y = ((int16_t) msblsb); /* Data in Y axis */
 
-            lsb = data[4];
-            msb = data[5];
+            lsb = data[5];
+            msb = data[6];
             msblsb = (msb << 8) | lsb;
             accel->z = ((int16_t) msblsb); /* Data in Z axis */
         }

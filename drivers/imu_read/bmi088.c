@@ -48,19 +48,32 @@ bool bmi088_init(struct BMI088 *bmi) {
     }
 
     printf("acc pass*!!!!!!!!!\n");
-
+    
+    
     if ((rslt = bmi08g_init(&bmi->_dev)) != BMI08X_OK) {
         printf("Failed to initialize gyroscope!\n");
+        return false;
     }
 
-    bmi08a_get_power_mode(&bmi->_dev);
-    bmi08g_get_power_mode(&bmi->_dev);
-    bmi08a_get_meas_conf(&bmi->_dev);
-    bmi08g_get_meas_conf(&bmi->_dev);
+    printf("gyro pass*!!!!!!!!!\n");
+    
+
+
+    // int8_t r1 = bmi08a_get_power_mode(&bmi->_dev);
+    // printf("power mode %d", bmi->_dev.accel_cfg.power);
+
+    // int8_t r2 = bmi08g_get_power_mode(&bmi->_dev);
+    // int8_t r3 = bmi08a_get_meas_conf(&bmi->_dev);
+    // int8_t r4 = bmi08g_get_meas_conf(&bmi->_dev);
+    
+    // // uint8_t my_status = ; 
+    // // bmi08a_get_status(&my_status, &bmi->_dev);
+
+    // printf("r1: %d, r2: %d, r3: %d, r4: %d\n", r1, r2, r3, r4);
 
     bmi->_dev.accel_cfg.power = BMI08X_ACCEL_PM_ACTIVE;
     bmi->_dev.accel_cfg.odr = BMI08X_ACCEL_ODR_400_HZ;
-
+    // bmi->_dev.accel_cfg.bw = BMI08X_ACCEL_BW_NORMAL; /* Bandwidth and OSR are same */
     bmi->_dev.gyro_cfg.power = BMI08X_GYRO_PM_NORMAL;
     bmi->_dev.gyro_cfg.odr = BMI08X_GYRO_BW_47_ODR_400_HZ;
 
@@ -69,12 +82,23 @@ bool bmi088_init(struct BMI088 *bmi) {
     bmi->_dev.accel_cfg.range = 0x00; // (uint8_t)accel_fsr;
     bmi->_dev.gyro_cfg.range = 0x03;  // 4 - (uint8_t)gyro_fsr;
 
-    bmi08a_set_power_mode(&bmi->_dev);
-    bmi08g_set_power_mode(&bmi->_dev);
-    bmi08a_set_meas_conf(&bmi->_dev);
-    bmi08g_set_meas_conf(&bmi->_dev);
+    // usleep(5000);
+    int8_t r5 = bmi08a_set_power_mode(&bmi->_dev);
+    // printf("power mode after set %d\n", bmi->_dev.accel_cfg.power);
 
-    // TODO: check if actually successful
+    int8_t r1 = bmi08a_get_power_mode(&bmi->_dev);
+    // printf("power mode %d", bmi->_dev.accel_cfg.power);
+
+    int8_t r6 = bmi08g_set_power_mode(&bmi->_dev);
+    int8_t r7 = bmi08a_set_meas_conf(&bmi->_dev);
+    int8_t r8 = bmi08g_set_meas_conf(&bmi->_dev);
+
+    // printf("r5: %d, r6: %d, r7: %d, r8: %d\n", r5, r6, r7, r8);
+
+    // uint8_t my_status = 0;
+    // bmi08a_get_data_int_status(&my_status, &bmi->_dev);
+
+    // // TODO: check if actually successful
     return true;
 }
 
@@ -97,7 +121,7 @@ bool bmi088_sample(struct BMI088 *bmi088, InertialMeasurement *meas) {
         return false;
     }
 
-    printf("Accelerations: a_x = %+.2f [g], a_y = %+.2f [g], a_z = %+.2f [g]\n", accel_meas.x, accel_meas.y, accel_meas.z);
+    printf("Accelerations: a_x = %+.10f [g], a_y = %+.10f [g], a_z = %+.10f [g]\n", accel_meas.x, accel_meas.y, accel_meas.z);
 
     // Sample gyroscope
     result = bmi08g_get_data(&data, &bmi088->_dev);
