@@ -65,8 +65,8 @@ class SimplePdCtrler : public rclcpp::Node
     }
 
     // desired heading
-    double yaw_d = 0.25*PI;
-    double Kp = 3;  // >=0
+    double yaw_d = 0.0;
+    double Kp = 1;  // >=0
     double Kd = 0.1; // >=0
 
     // state storage
