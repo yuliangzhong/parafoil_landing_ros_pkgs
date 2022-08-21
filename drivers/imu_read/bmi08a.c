@@ -1263,7 +1263,6 @@ int8_t bmi08a_get_data(struct bmi08x_sensor_data *accel, struct bmi08x_dev *dev)
     {
         /* Read accel sensor data */
         rslt = bmi08a_get_regs(BMI08X_REG_ACCEL_X_LSB, data, 7, dev);
-        printf("read acc data result %d\n", rslt);
         if (rslt == BMI08X_OK)
         {
             lsb = data[1];
