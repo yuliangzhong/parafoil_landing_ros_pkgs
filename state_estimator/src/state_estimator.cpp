@@ -20,8 +20,8 @@ using VectorXd = Eigen::Matrix<double, Eigen::Dynamic, 1>;
 
 #define PI 3.14159265358979323846
 
-double Vh_guess = 4.0; // [m/s]
-double Vz_guess = 2.0; // [m/s]
+double Vh_guess = 0.46; // [m/s]
+double Vz_guess = 1.31; // [m/s]
 double ang_vel_accu = 10 /180*PI; // [rad/s]
 
 class StateEstimator : public rclcpp::Node
@@ -37,7 +37,7 @@ class StateEstimator : public rclcpp::Node
         body_ang_vel_sub = this->create_subscription<Vector3Stamped>(
                                              "body_ang_vel", 1, std::bind(&StateEstimator::body_ang_vel_callback, this, _1));
         
-        // ekf_switch_sub = this->create_subscription<Int32>("ekf_switch", 1, std::bind(&StateEstimator::switch_callback, this, _1));
+        ekf_switch_sub = this->create_subscription<Int32>("ekf_switch", 1, std::bind(&StateEstimator::switch_callback, this, _1));
 
         states_mu = VectorXd::Zero(6);
         states_sigma = MatrixXd::Zero(6,6);
@@ -53,8 +53,7 @@ class StateEstimator : public rclcpp::Node
   private:
     void ekf_callback()
     {
-        // if(pos_update_flag == false or ang_update_flag == false or ekf_switch_flag == false) {return;}
-        if(pos_update_flag == false or ang_update_flag == false) {return;}
+        if(pos_update_flag == false or ang_update_flag == false or ekf_switch_flag == false) {return;}
 
         ///// EKF starts /////
         // state X = [x, y, z, yaw, Vh, Vz]^T 6*1
@@ -62,7 +61,7 @@ class StateEstimator : public rclcpp::Node
         // dynamics disturbance D = dwz 1*1
         // sensor observation Zs = [I_r_IB; dx; dy] 5*1
         // sensor error E = [e_pos; edx; edy] 5*1
-        double wz = - body_ang_vel_now.vector.z; // approx
+        double wz = body_ang_vel_now.vector.z; // approx
 
         ///// Prior update /////
         // [xp, A, S] = Dyn(Ts, state_mu, U, 0);
@@ -177,18 +176,18 @@ class StateEstimator : public rclcpp::Node
         ang_update_flag = true;
     }
 
-    // void switch_callback(const Int32 & msg)
-    // {
-    //     if (msg.data == 0)
-    //     {
-    //         ekf_init_flag == false;
-    //         ekf_switch_flag = false;
-    //     }
-    //     else
-    //     {
-    //         ekf_switch_flag = true;
-    //     }
-    // }
+    void switch_callback(const Int32 & msg)
+    {
+        if (msg.data == 0)
+        {
+            ekf_init_flag = false;
+            ekf_switch_flag = false;
+        }
+        else
+        {
+            ekf_switch_flag = true;
+        }
+    }
 
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Publisher<Vector3Stamped>::SharedPtr pos_pub;
@@ -196,7 +195,7 @@ class StateEstimator : public rclcpp::Node
     
     rclcpp::Subscription<Vector3Stamped>::SharedPtr pos_sub;
     rclcpp::Subscription<Vector3Stamped>::SharedPtr body_ang_vel_sub;
-    // rclcpp::Subscription<Int32>::SharedPtr ekf_switch_sub;
+    rclcpp::Subscription<Int32>::SharedPtr ekf_switch_sub;
 
     // data storage
     Vector3Stamped pos_last;
@@ -212,7 +211,7 @@ class StateEstimator : public rclcpp::Node
 
     // EKF update flags
     bool ekf_init_flag = false;
-    // bool ekf_switch_flag = false;
+    bool ekf_switch_flag = false;
     bool pos_update_flag = false;
     bool ang_update_flag = false;
 
