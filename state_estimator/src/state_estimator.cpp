@@ -29,8 +29,8 @@ class StateEstimator : public rclcpp::Node
   public:
     StateEstimator() : Node("state_estimator"), Ts(0.1)
     {
-        pos_pub = this->create_publisher<Vector3Stamped>("estimated_pos_verify", 1);
-        vel_pub = this->create_publisher<Vector3Stamped>("estimated_vel_verify", 1);
+        pos_pub = this->create_publisher<Vector3Stamped>("estimated_pos", 1);
+        vel_pub = this->create_publisher<Vector3Stamped>("estimated_vel", 1);
         timer_ = this->create_wall_timer(100ms, std::bind(&StateEstimator::ekf_callback, this));
 
         pos_sub = this->create_subscription<Vector3Stamped>("position", 1, std::bind(&StateEstimator::pos_callback, this, _1));
