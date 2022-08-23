@@ -5,6 +5,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "geometry_msgs/msg/vector3_stamped.hpp"
+#include "std_msgs/msg/int32.hpp"
 
 #include <eigen3/Eigen/Dense>
 #include <cmath>
@@ -13,6 +14,7 @@ using namespace std::chrono_literals;
 using std::placeholders::_1;
 
 using Vector3Stamped = geometry_msgs::msg::Vector3Stamped;
+using Int32 = std_msgs::msg::Int32;
 using MatrixXd = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>;
 using VectorXd = Eigen::Matrix<double, Eigen::Dynamic, 1>;
 
@@ -20,21 +22,23 @@ using VectorXd = Eigen::Matrix<double, Eigen::Dynamic, 1>;
 
 double Vh_guess = 4.0; // [m/s]
 double Vz_guess = 2.0; // [m/s]
-double ang_vel_accu = 1 /180*PI; // [rad/s]
+double ang_vel_accu = 10 /180*PI; // [rad/s]
 
 class StateEstimator : public rclcpp::Node
 {
   public:
     StateEstimator() : Node("state_estimator"), Ts(0.1)
     {
-        pos_pub = this->create_publisher<Vector3Stamped>("estimated_pos", 1);
-        vel_pub = this->create_publisher<Vector3Stamped>("estimated_vel", 1);
+        pos_pub = this->create_publisher<Vector3Stamped>("estimated_pos_verify", 1);
+        vel_pub = this->create_publisher<Vector3Stamped>("estimated_vel_verify", 1);
         timer_ = this->create_wall_timer(100ms, std::bind(&StateEstimator::ekf_callback, this));
 
         pos_sub = this->create_subscription<Vector3Stamped>("position", 1, std::bind(&StateEstimator::pos_callback, this, _1));
         body_ang_vel_sub = this->create_subscription<Vector3Stamped>(
                                              "body_ang_vel", 1, std::bind(&StateEstimator::body_ang_vel_callback, this, _1));
-      
+        
+        // ekf_switch_sub = this->create_subscription<Int32>("ekf_switch", 1, std::bind(&StateEstimator::switch_callback, this, _1));
+
         states_mu = VectorXd::Zero(6);
         states_sigma = MatrixXd::Zero(6,6);
         states_sigma.block(0,0,3,3) = 4*MatrixXd::Identity(3,3);
@@ -43,22 +47,22 @@ class StateEstimator : public rclcpp::Node
         states_sigma(5,5) = 0.5;
 
         Q = pow(ang_vel_accu,2);
-        // Q = 0.5;
-        R = 0.5*MatrixXd::Identity(5,5);
+        R = 0.1*MatrixXd::Identity(5,5);
     }
 
   private:
     void ekf_callback()
     {
+        // if(pos_update_flag == false or ang_update_flag == false or ekf_switch_flag == false) {return;}
         if(pos_update_flag == false or ang_update_flag == false) {return;}
-        
+
         ///// EKF starts /////
         // state X = [x, y, z, yaw, Vh, Vz]^T 6*1
         // control input U = wz 1*1
         // dynamics disturbance D = dwz 1*1
         // sensor observation Zs = [I_r_IB; dx; dy] 5*1
         // sensor error E = [e_pos; edx; edy] 5*1
-        double wz = body_ang_vel_now.vector.z; // approx
+        double wz = - body_ang_vel_now.vector.z; // approx
 
         ///// Prior update /////
         // [xp, A, S] = Dyn(Ts, state_mu, U, 0);
@@ -173,12 +177,26 @@ class StateEstimator : public rclcpp::Node
         ang_update_flag = true;
     }
 
+    // void switch_callback(const Int32 & msg)
+    // {
+    //     if (msg.data == 0)
+    //     {
+    //         ekf_init_flag == false;
+    //         ekf_switch_flag = false;
+    //     }
+    //     else
+    //     {
+    //         ekf_switch_flag = true;
+    //     }
+    // }
+
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Publisher<Vector3Stamped>::SharedPtr pos_pub;
     rclcpp::Publisher<Vector3Stamped>::SharedPtr vel_pub;
     
     rclcpp::Subscription<Vector3Stamped>::SharedPtr pos_sub;
     rclcpp::Subscription<Vector3Stamped>::SharedPtr body_ang_vel_sub;
+    // rclcpp::Subscription<Int32>::SharedPtr ekf_switch_sub;
 
     // data storage
     Vector3Stamped pos_last;
@@ -194,6 +212,7 @@ class StateEstimator : public rclcpp::Node
 
     // EKF update flags
     bool ekf_init_flag = false;
+    // bool ekf_switch_flag = false;
     bool pos_update_flag = false;
     bool ang_update_flag = false;
 

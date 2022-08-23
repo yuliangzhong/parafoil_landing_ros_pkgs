@@ -12,10 +12,11 @@ find_package(ament_cmake REQUIRED)
 # find_package(<dependency> REQUIRED)
 
 find_package(rclcpp REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
 add_executable(state_estimator src/state_estimator.cpp)
-ament_target_dependencies(state_estimator rclcpp geometry_msgs)
+ament_target_dependencies(state_estimator rclcpp std_msgs geometry_msgs)
 
 install(TARGETS
   state_estimator
