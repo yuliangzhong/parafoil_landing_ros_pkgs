@@ -152,7 +152,7 @@ class Simulator(Node):
 
         # state init
         # position, quaternion, velocity, angular velocity in the initial(ground) frame
-        self.pos = np.array([-10, -10, -50], dtype=float64).reshape(-1,1)
+        self.pos = np.array([-10, -10, -5000], dtype=float64).reshape(-1,1)
         self.quat = matrix2quat(rpy2matrix3(np.array([0, 0.006, -60/180*pi], dtype=float64).reshape(-1,1)))
         self.vel = dot(quat2matrix(self.quat), np.array([3.819, -0.673, 1.62], dtype=float64).reshape(-1,1))
         self.ang_vel = np.zeros((3,1), dtype=float64)

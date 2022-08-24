@@ -39,18 +39,18 @@ class StateEstimator : public rclcpp::Node
         
         ekf_switch_sub = this->create_subscription<Int32>("ekf_switch", 1, std::bind(&StateEstimator::switch_callback, this, _1));
 
-        states_mu = VectorXd::Zero(6);
-        states_sigma = MatrixXd::Zero(6,6);
-        states_sigma.block(0,0,3,3) = 4*MatrixXd::Identity(3,3);
-        states_sigma(3,3) = 1;
-        states_sigma(4,4) = 0.5;
-        states_sigma(5,5) = 0.5;
-
         Q = pow(ang_vel_accu,2);
         R = 0.1*MatrixXd::Identity(5,5);
+
+        // debug_timer_ = this->create_wall_timer(50ms, std::bind(&StateEstimator::debug_callback, this));
     }
 
   private:
+    // void debug_callback()
+    // {
+    //     printf("(%d, %d, %d, %d)\n", int(pos_update_flag), int(ang_update_flag), int(ekf_switch_flag), int(ekf_init_flag));
+    // }
+
     void ekf_callback()
     {
         if(pos_update_flag == false or ang_update_flag == false or ekf_switch_flag == false) {return;}
@@ -149,24 +149,33 @@ class StateEstimator : public rclcpp::Node
 
     void pos_callback(const Vector3Stamped & msg)
     {
-        if (ekf_init_flag == false)
+        if (ekf_switch_flag == true)
         {
-            // init EKF
-            states_mu(0) = msg.vector.x;
-            states_mu(1) = msg.vector.y;
-            states_mu(2) = msg.vector.z;
-            states_mu(3) = 0.0;
-            states_mu(4) = Vh_guess;
-            states_mu(5) = Vz_guess;
-            
-            pos_now = msg;
-            ekf_init_flag = true;
-        }
-        else
-        {
-            pos_last = pos_now;
-            pos_now = msg;
-            pos_update_flag = true;
+            if (ekf_init_flag == false)
+            {
+                // init EKF
+                states_mu = VectorXd::Zero(6);
+                states_mu(0) = msg.vector.x;
+                states_mu(1) = msg.vector.y;
+                states_mu(2) = msg.vector.z;
+                states_mu(3) = 0.0;
+                states_mu(4) = Vh_guess;
+                states_mu(5) = Vz_guess;
+                states_sigma = MatrixXd::Zero(6,6);
+                states_sigma.block(0,0,3,3) = 4*MatrixXd::Identity(3,3);
+                states_sigma(3,3) = 1;
+                states_sigma(4,4) = 0.5;
+                states_sigma(5,5) = 0.5;
+                
+                pos_now = msg;
+                ekf_init_flag = true;
+            }
+            else
+            {
+                pos_last = pos_now;
+                pos_now = msg;
+                pos_update_flag = true;
+            }
         }
     }
 
@@ -190,6 +199,7 @@ class StateEstimator : public rclcpp::Node
     }
 
     rclcpp::TimerBase::SharedPtr timer_;
+    // rclcpp::TimerBase::SharedPtr debug_timer_;
     rclcpp::Publisher<Vector3Stamped>::SharedPtr pos_pub;
     rclcpp::Publisher<Vector3Stamped>::SharedPtr vel_pub;
     
