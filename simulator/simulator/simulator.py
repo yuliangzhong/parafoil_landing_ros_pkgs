@@ -6,7 +6,7 @@ from geometry_msgs.msg import Vector3Stamped
 import numpy as np
 from numpy import dot, float64
 from random import randint
-from math import pi, sin, cos, sqrt, atan, atan2, asin
+from math import pi, sin, cos, sqrt, atan, atan2, asin, exp
 import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d
 
@@ -152,7 +152,7 @@ class Simulator(Node):
 
         # state init
         # position, quaternion, velocity, angular velocity in the initial(ground) frame
-        self.pos = np.array([-10, -10, -5000], dtype=float64).reshape(-1,1)
+        self.pos = np.array([-10, -10, -80], dtype=float64).reshape(-1,1)
         self.quat = matrix2quat(rpy2matrix3(np.array([0, 0.006, -60/180*pi], dtype=float64).reshape(-1,1)))
         self.vel = dot(quat2matrix(self.quat), np.array([3.819, -0.673, 1.62], dtype=float64).reshape(-1,1))
         self.ang_vel = np.zeros((3,1), dtype=float64)
@@ -296,7 +296,8 @@ class Simulator(Node):
 
         body_ang_vel_rand = np.random.multivariate_normal([0,0,0], np.eye(3), 1).reshape(-1)
         tmp_body_ang_vel = dot(quat2matrix(self.quat).T, self.ang_vel).reshape(-1) + ang_vel_accu*body_ang_vel_rand
-        # tmp_body_ang_vel = dot(quat2matrix(self.quat).T, self.ang_vel).reshape(-1)
+        # add observed body oscillation in z-axis
+        tmp_body_ang_vel[2] += 3*exp(-0.25*self.cnt*dT)*cos(4*pi*self.cnt*dT)
         body_ang_vel_msg = Vector3Stamped()
         body_ang_vel_msg.vector.x, body_ang_vel_msg.vector.y, body_ang_vel_msg.vector.z = tmp_body_ang_vel[0], tmp_body_ang_vel[1], tmp_body_ang_vel[2]
         body_ang_vel_msg.header.stamp = current_time

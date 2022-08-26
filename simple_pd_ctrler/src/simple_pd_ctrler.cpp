@@ -15,6 +15,8 @@ using Vector3Stamped = geometry_msgs::msg::Vector3Stamped;
 
 #define PI 3.14159265358979323846
 
+const double dL = 0.05;
+
 class SimplePdCtrler : public rclcpp::Node
 {
   public:
@@ -32,8 +34,14 @@ class SimplePdCtrler : public rclcpp::Node
     void cmd_callback()
     {
       if (vel_update_flag == false or ang_update_flag == false) {return; }
-      
-      double delta_yaw = vel_now.vector.x - yaw_d;
+
+      double yaw_now = vel_now.vector.x;
+      // interpret estimated vel
+      if (vel_now.vector.y < 0)
+      {
+        yaw_now = vel_now.vector.x + PI;
+      }
+      double delta_yaw = yaw_now - yaw_d;
       double yaw_dot_now = body_ang_vel_now.vector.z; // approx
 
       double err = atan2(sin(delta_yaw), cos(delta_yaw));
@@ -41,10 +49,14 @@ class SimplePdCtrler : public rclcpp::Node
 
       auto cmd = Vector3Stamped();
       cmd.header.stamp = this->get_clock()->now();
-      cmd.vector.x = max(0.0, min(1.0, 0.5 + u));
-      cmd.vector.y = max(0.0, min(1.0, 0.5 - u));
+      cmd.vector.x = min(min(0.5 + u, 1.0), last_cmd_l + dL);
+      cmd.vector.x = max(max(cmd.vector.x, 0.0), last_cmd_l - dL);
+      cmd.vector.y = min(min(0.5 - u, 1.0), last_cmd_r + dL);
+      cmd.vector.y = max(max(cmd.vector.y, 0.0), last_cmd_r - dL);
       cmd.vector.z = 0.0;
       cmd_pub->publish(cmd);
+      last_cmd_l = cmd.vector.x;
+      last_cmd_r = cmd.vector.y;
      
       RCLCPP_INFO(this->get_logger(), "delta_l, delta_r = [%.2f, %.2f]", cmd.vector.x, cmd.vector.y);
       
@@ -72,6 +84,8 @@ class SimplePdCtrler : public rclcpp::Node
     // state storage
     Vector3Stamped vel_now;
     Vector3Stamped body_ang_vel_now;
+    double last_cmd_l = 0;
+    double last_cmd_r = 0;
 
     // publisher
     rclcpp::TimerBase::SharedPtr timer_;
