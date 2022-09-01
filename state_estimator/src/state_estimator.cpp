@@ -5,7 +5,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "geometry_msgs/msg/vector3_stamped.hpp"
-#include "std_msgs/msg/int32.hpp"
+#include "std_msgs/msg/bool.hpp"
 
 #include <eigen3/Eigen/Dense>
 #include <cmath>
@@ -14,7 +14,7 @@ using namespace std::chrono_literals;
 using std::placeholders::_1;
 
 using Vector3Stamped = geometry_msgs::msg::Vector3Stamped;
-using Int32 = std_msgs::msg::Int32;
+using Bool = std_msgs::msg::Bool;
 using MatrixXd = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>;
 using VectorXd = Eigen::Matrix<double, Eigen::Dynamic, 1>;
 
@@ -36,8 +36,8 @@ class StateEstimator : public rclcpp::Node
         pos_sub = this->create_subscription<Vector3Stamped>("position", 1, std::bind(&StateEstimator::pos_callback, this, _1));
         body_ang_vel_sub = this->create_subscription<Vector3Stamped>(
                                              "body_ang_vel", 1, std::bind(&StateEstimator::body_ang_vel_callback, this, _1));
-        
-        ekf_switch_sub = this->create_subscription<Int32>("ekf_switch", 1, std::bind(&StateEstimator::switch_callback, this, _1));
+
+        ekf_switch_sub = this->create_subscription<Bool>("/rockpara_actuators_node/manual_override_on", 1, std::bind(&StateEstimator::switch_callback, this, _1));
 
         Q = pow(ang_vel_accu,2);
         R = 0.1*MatrixXd::Identity(5,5);
@@ -185,9 +185,9 @@ class StateEstimator : public rclcpp::Node
         ang_update_flag = true;
     }
 
-    void switch_callback(const Int32 & msg)
+    void switch_callback(const Bool & msg)
     {
-        if (msg.data == 0)
+        if (msg.data == true)
         {
             ekf_init_flag = false;
             ekf_switch_flag = false;
@@ -205,7 +205,7 @@ class StateEstimator : public rclcpp::Node
     
     rclcpp::Subscription<Vector3Stamped>::SharedPtr pos_sub;
     rclcpp::Subscription<Vector3Stamped>::SharedPtr body_ang_vel_sub;
-    rclcpp::Subscription<Int32>::SharedPtr ekf_switch_sub;
+    rclcpp::Subscription<Bool>::SharedPtr ekf_switch_sub;
 
     // data storage
     Vector3Stamped pos_last;

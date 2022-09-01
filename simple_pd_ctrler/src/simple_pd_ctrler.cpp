@@ -22,7 +22,8 @@ class SimplePdCtrler : public rclcpp::Node
   public:
     SimplePdCtrler() : Node("simple_pd_ctrler")
     {
-      cmd_pub = this->create_publisher<Vector3Stamped>("delta_left_right_01", 1);
+      // delta_left_right_01
+      cmd_pub = this->create_publisher<Vector3Stamped>("/rockpara_actuators_node/auto_commands", 1);
       timer_ = this->create_wall_timer(100ms, std::bind(&SimplePdCtrler::cmd_callback, this));
 
       vel_sub = this->create_subscription<Vector3Stamped>("estimated_vel", 1, std::bind(&SimplePdCtrler::vel_callback, this, _1));
