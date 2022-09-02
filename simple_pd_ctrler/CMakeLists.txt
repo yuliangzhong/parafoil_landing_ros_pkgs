@@ -11,12 +11,11 @@ find_package(ament_cmake REQUIRED)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
-find_package(interfaces REQUIRED)
-find_package(message_filters REQUIRED)
 
 add_executable(simple_pd_ctrler src/simple_pd_ctrler.cpp)
-ament_target_dependencies(simple_pd_ctrler rclcpp geometry_msgs interfaces message_filters)
+ament_target_dependencies(simple_pd_ctrler rclcpp std_msgs geometry_msgs)
 
 install(TARGETS
   simple_pd_ctrler

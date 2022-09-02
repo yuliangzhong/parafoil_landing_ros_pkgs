@@ -15,7 +15,8 @@ using Vector3Stamped = geometry_msgs::msg::Vector3Stamped;
 
 #define PI 3.14159265358979323846
 
-const double dL = 0.05;
+const double dT = 0.1; // [s]
+const double dL = 0.5 * dT; // normalized [0,1] brake change for each time step (dT)
 
 class SimplePdCtrler : public rclcpp::Node
 {
@@ -24,28 +25,29 @@ class SimplePdCtrler : public rclcpp::Node
     {
       // delta_left_right_01
       cmd_pub = this->create_publisher<Vector3Stamped>("/rockpara_actuators_node/auto_commands", 1);
-      timer_ = this->create_wall_timer(100ms, std::bind(&SimplePdCtrler::cmd_callback, this));
+      timer_ = this->create_wall_timer(200ms, std::bind(&SimplePdCtrler::cmd_callback, this));
 
       vel_sub = this->create_subscription<Vector3Stamped>("estimated_vel", 1, std::bind(&SimplePdCtrler::vel_callback, this, _1));
-      body_ang_vel_sub = this->create_subscription<Vector3Stamped>(
-                                             "body_ang_vel", 1, std::bind(&SimplePdCtrler::body_ang_vel_callback, this, _1));
     }
 
   private:
     void cmd_callback()
     {
-      if (vel_update_flag == false or ang_update_flag == false) {return; }
-
-      double yaw_now = vel_now.vector.x;
-      // interpret estimated vel
-      if (vel_now.vector.y < 0)
+      if (vel_update_flag == false)
       {
-        yaw_now = vel_now.vector.x + PI;
+        vel_init_flag = false;
+        last_cmd_l = 0.5;
+        last_cmd_r = 0.5;
+        return;
       }
-      double delta_yaw = yaw_now - yaw_d;
-      double yaw_dot_now = body_ang_vel_now.vector.z; // approx
 
-      double err = atan2(sin(delta_yaw), cos(delta_yaw));
+      // interpret estimated vel
+      double yaw_now = (vel_now.vector.y < 0 ? vel_now.vector.x + PI : vel_now.vector.x);
+      double yaw_last = (vel_last.vector.y < 0 ? vel_last.vector.x + PI : vel_last.vector.x);
+      
+      // simple pd controller
+      double err = atan2(sin(yaw_now - yaw_d), cos(yaw_now - yaw_d));
+      double yaw_dot_now = atan2(sin(yaw_now - yaw_last), cos(yaw_now - yaw_last))/dT;
       double u = Kp*err + Kd*yaw_dot_now;
 
       auto cmd = Vector3Stamped();
@@ -62,19 +64,21 @@ class SimplePdCtrler : public rclcpp::Node
       RCLCPP_INFO(this->get_logger(), "delta_l, delta_r = [%.2f, %.2f]", cmd.vector.x, cmd.vector.y);
       
       vel_update_flag = false;
-      ang_update_flag = false;
     }
 
     void vel_callback(const Vector3Stamped & msg)
     {
-      vel_now = msg;
-      vel_update_flag = true;
-    }
-
-    void body_ang_vel_callback(const Vector3Stamped & msg)
-    {
-      body_ang_vel_now = msg;
-      ang_update_flag = true;
+      if (vel_init_flag == false)
+      {
+        vel_last = msg;
+        vel_init_flag = true;
+      }
+      else
+      {
+        vel_last = vel_now;
+        vel_now = msg;
+        vel_update_flag = true;
+      }
     }
 
     // desired heading
@@ -82,23 +86,20 @@ class SimplePdCtrler : public rclcpp::Node
     double Kp = 1;  // >=0
     double Kd = 0.1; // >=0
 
-    // state storage
-    Vector3Stamped vel_now;
-    Vector3Stamped body_ang_vel_now;
-    double last_cmd_l = 0;
-    double last_cmd_r = 0;
-
-    // publisher
+    // publishers / subscribers
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Publisher<Vector3Stamped>::SharedPtr cmd_pub;
-    
-    // subscribers
     rclcpp::Subscription<Vector3Stamped>::SharedPtr vel_sub;
-    rclcpp::Subscription<Vector3Stamped>::SharedPtr body_ang_vel_sub;
 
-    // update flags
+    // control flags
+    bool vel_init_flag = false;
     bool vel_update_flag = false;
-    bool ang_update_flag = false;
+
+    // state storage
+    Vector3Stamped vel_last;
+    Vector3Stamped vel_now;
+    double last_cmd_l;
+    double last_cmd_r;
 };
 
 int main(int argc, char * argv[])

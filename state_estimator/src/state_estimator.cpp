@@ -124,27 +124,29 @@ class StateEstimator : public rclcpp::Node
 
         ///// EKF ends   /////
 
-        // publish results
-        auto pos_msg = Vector3Stamped();
-        pos_msg.vector.x = states_mu(0);
-        pos_msg.vector.y = states_mu(1);
-        pos_msg.vector.z = states_mu(2);
-        auto vel_msg = Vector3Stamped();
-        vel_msg.vector.x = atan2(sin(states_mu(3)), cos(states_mu(3))); // warp yaw output to [-pi,pi)
-        vel_msg.vector.y = states_mu(4);
-        vel_msg.vector.z = states_mu(5);
+        if (states_sigma.maxCoeff() < estimation_cov_mat_max_limit)
+        {  
+            // publish results
+            auto pos_msg = Vector3Stamped();
+            pos_msg.vector.x = states_mu(0);
+            pos_msg.vector.y = states_mu(1);
+            pos_msg.vector.z = states_mu(2);
+            auto vel_msg = Vector3Stamped();
+            vel_msg.vector.x = atan2(sin(states_mu(3)), cos(states_mu(3))); // warp yaw output to [-pi,pi)
+            vel_msg.vector.y = states_mu(4);
+            vel_msg.vector.z = states_mu(5);
 
-        pos_msg.header.stamp = this->get_clock()->now();
-        vel_msg.header.stamp = pos_msg.header.stamp;
+            pos_msg.header.stamp = this->get_clock()->now();
+            vel_msg.header.stamp = pos_msg.header.stamp;
 
-        pos_pub->publish(pos_msg);
-        vel_pub->publish(vel_msg);
-        
-        // close flag
+            pos_pub->publish(pos_msg);
+            vel_pub->publish(vel_msg);
+        }
+
+        // close flag and print
         pos_update_flag = false;
         ang_update_flag = false;
-
-        printf("pos: (%.3f, %.3f, %.3f), heading: %.3f \n", pos_msg.vector.x, pos_msg.vector.y, pos_msg.vector.z, vel_msg.vector.x);
+        printf("pos: (%.3f, %.3f, %.3f), heading: %.3f \n, cov_max: %.3f", pos_msg.vector.x, pos_msg.vector.y, pos_msg.vector.z, vel_msg.vector.x, cov_msg.data);
     }
 
     void pos_callback(const Vector3Stamped & msg)
@@ -225,6 +227,8 @@ class StateEstimator : public rclcpp::Node
     bool pos_update_flag = false;
     bool ang_update_flag = false;
 
+    // EKF converge criterion
+    double estimation_cov_mat_max_limit = 0.05;
 };
 
 int main(int argc, char * argv[])
