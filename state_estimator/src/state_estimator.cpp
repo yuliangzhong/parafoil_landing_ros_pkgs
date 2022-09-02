@@ -6,6 +6,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "geometry_msgs/msg/vector3_stamped.hpp"
 #include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/float64.hpp"
 
 #include <eigen3/Eigen/Dense>
 #include <cmath>
@@ -15,6 +16,7 @@ using std::placeholders::_1;
 
 using Vector3Stamped = geometry_msgs::msg::Vector3Stamped;
 using Bool = std_msgs::msg::Bool;
+using Float64 = std_msgs::msg::Float64;
 using MatrixXd = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>;
 using VectorXd = Eigen::Matrix<double, Eigen::Dynamic, 1>;
 
@@ -31,6 +33,7 @@ class StateEstimator : public rclcpp::Node
     {
         pos_pub = this->create_publisher<Vector3Stamped>("estimated_pos", 1);
         vel_pub = this->create_publisher<Vector3Stamped>("estimated_vel", 1);
+        cov_pub = this->create_publisher<Float64>("estimation_cov_max", 1);
         timer_ = this->create_wall_timer(100ms, std::bind(&StateEstimator::ekf_callback, this));
 
         pos_sub = this->create_subscription<Vector3Stamped>("position", 1, std::bind(&StateEstimator::pos_callback, this, _1));
@@ -141,12 +144,18 @@ class StateEstimator : public rclcpp::Node
 
             pos_pub->publish(pos_msg);
             vel_pub->publish(vel_msg);
+            printf("pos: (%.3f, %.3f, %.3f), heading: %.3f, cov_max: %.3f\n", pos_msg.vector.x, pos_msg.vector.y, pos_msg.vector.z, vel_msg.vector.x, states_sigma.maxCoeff());
         }
+
+        // for real-world experiment debugging
+        auto cov_msg = Float64();
+        cov_msg.data = states_sigma.maxCoeff();
+        cov_pub->publish(cov_msg);
 
         // close flag and print
         pos_update_flag = false;
         ang_update_flag = false;
-        printf("pos: (%.3f, %.3f, %.3f), heading: %.3f \n, cov_max: %.3f", pos_msg.vector.x, pos_msg.vector.y, pos_msg.vector.z, vel_msg.vector.x, cov_msg.data);
+        // printf("cov_max: %.3f\n", states_sigma.maxCoeff());
     }
 
     void pos_callback(const Vector3Stamped & msg)
@@ -204,6 +213,7 @@ class StateEstimator : public rclcpp::Node
     // rclcpp::TimerBase::SharedPtr debug_timer_;
     rclcpp::Publisher<Vector3Stamped>::SharedPtr pos_pub;
     rclcpp::Publisher<Vector3Stamped>::SharedPtr vel_pub;
+    rclcpp::Publisher<Float64>::SharedPtr cov_pub;
     
     rclcpp::Subscription<Vector3Stamped>::SharedPtr pos_sub;
     rclcpp::Subscription<Vector3Stamped>::SharedPtr body_ang_vel_sub;
@@ -228,7 +238,7 @@ class StateEstimator : public rclcpp::Node
     bool ang_update_flag = false;
 
     // EKF converge criterion
-    double estimation_cov_mat_max_limit = 0.05;
+    double estimation_cov_mat_max_limit = 0.02;
 };
 
 int main(int argc, char * argv[])

@@ -163,7 +163,7 @@ class Simulator(Node):
         self.delta_r = 0.5 # normalized in [0,1]
 
         # canopy deflection control subscribers
-        self.control_sub = self.create_subscription(Vector3Stamped, '/delta_left_right_01', self.control_callback, 1)
+        self.control_sub = self.create_subscription(Vector3Stamped, '/rockpara_actuators_node/auto_commands', self.control_callback, 1)
 
         self.pos_x_buffer = []
         self.pos_y_buffer = []

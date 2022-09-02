@@ -17,6 +17,8 @@ using Vector3Stamped = geometry_msgs::msg::Vector3Stamped;
 
 const double dT = 0.1; // [s]
 const double dL = 0.5 * dT; // normalized [0,1] brake change for each time step (dT)
+const double brake_min = 0.25;
+const double brake_max = 0.75;
 
 class SimplePdCtrler : public rclcpp::Node
 {
@@ -52,10 +54,10 @@ class SimplePdCtrler : public rclcpp::Node
 
       auto cmd = Vector3Stamped();
       cmd.header.stamp = this->get_clock()->now();
-      cmd.vector.x = min(min(0.5 + u, 1.0), last_cmd_l + dL);
-      cmd.vector.x = max(max(cmd.vector.x, 0.0), last_cmd_l - dL);
-      cmd.vector.y = min(min(0.5 - u, 1.0), last_cmd_r + dL);
-      cmd.vector.y = max(max(cmd.vector.y, 0.0), last_cmd_r - dL);
+      cmd.vector.x = min(min(0.5 + u, brake_max), last_cmd_l + dL);
+      cmd.vector.x = max(max(cmd.vector.x, brake_min), last_cmd_l - dL);
+      cmd.vector.y = min(min(0.5 - u, brake_max), last_cmd_r + dL);
+      cmd.vector.y = max(max(cmd.vector.y, brake_min), last_cmd_r - dL);
       cmd.vector.z = 0.0;
       cmd_pub->publish(cmd);
       last_cmd_l = cmd.vector.x;
@@ -83,7 +85,7 @@ class SimplePdCtrler : public rclcpp::Node
 
     // desired heading
     double yaw_d = 0.0;
-    double Kp = 1;  // >=0
+    double Kp = 0.5;  // >=0
     double Kd = 0.1; // >=0
 
     // publishers / subscribers
