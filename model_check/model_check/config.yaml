@@ -1,0 +1,11 @@
+# model params
+a: 0.43
+k: 0.341
+Ts: 0.1
+
+# initial states
+x0: 5.11
+y0: -20.54
+psi0: -0.575
+psi_dot0: 0.0
+Vh: 5.35
