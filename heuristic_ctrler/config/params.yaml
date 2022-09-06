@@ -7,8 +7,3 @@ heuristic_ctrler:
     heading: 0.0 # North
     landing_lat: 47.35504 # deg
     landing_lon: 8.51982 # deg
-
-    # project constants
-    R: 6371000 # m, radius of the earth
-    origin_lat: 47.35504 # degree
-    origin_lon: 8.51982 # degree
