@@ -73,16 +73,20 @@ class HeuristicCtrler(Node):
     def cmd_callback(self):
 
         if self.cnt % self.N == 0:
-            if self.control_mode == 1:
+            if self.control_mode == -1:
+                u = -0.6*self.um
+            elif self.control_mode == 0:
+                u = 0.6*self.um
+            elif self.control_mode == 1:
                 err = atan2(sin(self.yaw_now - self.heading), cos(self.yaw_now - self.heading))
+                u = self.cal_diff_brake(err, self.um)
             elif self.control_mode == 2:
                 yaw_d = atan2(self.land_y - self.pos_now.vector.y, self.land_x - self.pos_now.vector.x)
                 err = atan2(sin(self.yaw_now - yaw_d), cos(self.yaw_now - yaw_d))
+                u = self.cal_diff_brake(err, self.um)
             else:
                 print("Warning, the controller receives an undefined mode!")
-                err = 0
-            
-            u = self.cal_diff_brake(err, self.um)
+                u = 0
 
         else:
             u = 0
