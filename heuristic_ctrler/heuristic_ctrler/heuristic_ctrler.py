@@ -38,6 +38,8 @@ class HeuristicCtrler(Node):
         self.heading = self.get_parameter('heading').get_parameter_value().double_value
         landing_lat = self.get_parameter('landing_lat').get_parameter_value().double_value
         landing_lon = self.get_parameter('landing_lon').get_parameter_value().double_value
+        self.get_logger().info("Loaded parameter list:")
+        self.get_logger().info("%f, %d, %f, %d, %f, %f, %f\n" %(Ts, self.N, self.um, self.control_mode, self.heading, landing_lat, landing_lon))
 
         self.land_y = (landing_lon - origin_lon) / 180 * pi * R * cos(origin_lat / 180 * pi) # east = y+
         self.land_x = (landing_lat - origin_lat) / 180 * pi * R # north = x+

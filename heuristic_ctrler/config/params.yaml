@@ -1,11 +1,11 @@
 heuristic_ctrler:
   ros__parameters:
-    Ts: 0.5 # seconds for control
+    Ts: 0.5 # seconds for control, double
     N: 4 # total counts in a control cycle
     um: 0.5 # maximum differential brake, [0,0.5]
     control_mode: 0 # -1 for open-loop turn right, 0 for open-loop turn left, 1 for straight line, 2 for point
     # if control_mode == 1
     heading: 0.0 # North
     # if control_mode == 2
-    landing_lat: 47.35504 # deg
-    landing_lon: 8.51982 # deg
+    landing_lat: 47.35504 # deg, double
+    landing_lon: 8.51982 # deg, double
