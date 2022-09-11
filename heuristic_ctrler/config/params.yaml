@@ -1,11 +1,30 @@
 heuristic_ctrler:
   ros__parameters:
-    Ts: 0.5 # seconds for control, double
-    N: 4 # total counts in a control cycle
-    um: 0.5 # maximum differential brake, [0,0.5]
-    control_mode: 0 # -1 for open-loop turn right, 0 for open-loop turn left, 1 for straight line, 2 for point
-    # if control_mode == 1
-    heading: 0.0 # North
+    um: -0.3 # maximum differential brake, [-0.5, 0.5], double
+
+    control_mode: 2 # int
+    # 0 for open-loop step inputs; 
+    # 1 for heuristic step inputs (open-loop); 
+    # 2 for LQR control, fixed heading
+    # 3 for LQR control, fixed landing point
+
+    # if control_mode == 0:
+      # if um >= 0: turn left, step um, hold on
+      # if um < 0: turn right, step -um, hold on
+    
+    # if control_mode == 1:
+    Ts: 0.5 # [seconds], total control cycle period, double
+    ratio: 0.5 # (0,1], double
+      # if um >= 0: turn left, step um, ratio percentage to hold on
+      # if um < 0: turn right, step -um, ratio percentage to hold on
+    
     # if control_mode == 2
+    heading: 0.0 # deg from North, clockwise
+    # The control input is calculated by a LQR controller, and updates for each Ts
+    Kp: 0.2743 # based on Ts, double
+    Kd: 0.0506 # based on Ts, double
+    max_heading_diff: 45.0 # deg, (0, Inf), double
+    
+    # if control_mode == 3
     landing_lat: 47.35504 # deg, double
     landing_lon: 8.51982 # deg, double

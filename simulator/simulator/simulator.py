@@ -279,12 +279,13 @@ class Simulator(Node):
 
         ##### sensor publish #####
         pos_rand = np.random.multivariate_normal([0,0,0], np.eye(3), 1).reshape(-1)
-        tmp_pos = self.pos.reshape(-1) + [pos_rand[0]*pos_xy_accu, pos_rand[1]*pos_xy_accu, pos_rand[2]*pos_z_accu]
-        # tmp_pos = self.pos.reshape(-1)
+        # tmp_pos = self.pos.reshape(-1) + [pos_rand[0]*pos_xy_accu, pos_rand[1]*pos_xy_accu, pos_rand[2]*pos_z_accu]
+        tmp_pos = self.pos.reshape(-1)
         pos_msg = Vector3Stamped()
         pos_msg.vector.x, pos_msg.vector.y, pos_msg.vector.z = tmp_pos[0], tmp_pos[1], tmp_pos[2]
         pos_msg.header.stamp = current_time
-        self.pos_pub.publish(pos_msg)
+        if self.cnt % 4 == 0:
+            self.pos_pub.publish(pos_msg)
 
         body_acc_rand = np.random.multivariate_normal([0,0,0], np.eye(3), 1).reshape(-1)
         tmp_body_acc = self.body_acc.reshape(-1) + acc_accu*body_acc_rand
